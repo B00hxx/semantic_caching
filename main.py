@@ -20,3 +20,9 @@ response = client.chat(
 print(response['message']['content'])
 
 
+response_2 = client.embed(
+    model='qwen3-embedding:0.6b',
+    input='Why is the sky blue?'
+)
+
+print(response_2["embeddings"][0])
