@@ -1,4 +1,4 @@
-from config import ollama_client
+from config import ollama_client, MODELS
 
 class LLM():
     def __init__(self, model : str):
