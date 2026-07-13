@@ -8,6 +8,7 @@ class RedisService():
     def __init__(self, client):
         self.client = client
         self.status = redis_client.ping()
+    
     def add_entry(self, entry : CacheEntry):
         cache_id = str(uuid.uuid4())
         print(cache_id)
@@ -21,6 +22,7 @@ class RedisService():
             json.dumps(data)
         )
         return f"cache:{cache_id}"
+    
     def get_entry(self, identifier : str):
         return self.client.get(identifier)
 
@@ -31,3 +33,5 @@ print(testing.status)
 test_entry = CacheEntry("hello?", [0,1,2], "baha?")
 id = testing.add_entry(test_entry)
 print(testing.get_entry(id))
+
+#this is a test for me to check if vim works
