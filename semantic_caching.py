@@ -13,6 +13,7 @@ class SemanticCaching():
     def get_answers(self, prompt:str)-> tuple[bool, str]:
         state = False
         embedded = self.embedding.get_embedding(prompt)
+        #print(embedded.shape)
         for saved_entry in self.saved_answers:
             if cosine_similarity(embedded, saved_entry.embedding) >= self.threshold:
                 state = True
