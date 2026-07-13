@@ -2,6 +2,16 @@ import ollama
 import redis
 import numpy as np
 import pandas as pd
+import json
+
+
+try:
+    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    if r.ping():
+        print("Connected to Redis successfully!")
+except redis.ConnectionError:
+    print("Failed to connect to Redis.")
+
 
 client = ollama.Client(host='http://localhost:11434')
 saved_answers = dict()
@@ -29,13 +39,6 @@ def get_answer(prompt):
     saved_answers[prompt] = [np.array(embedded_response["embeddings"]), response['message']['content']]
     return None
 
-
-try:
-    r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-    if r.ping():
-        print("Connected to Redis successfully!")
-except redis.ConnectionError:
-    print("Failed to connect to Redis.")
 
 while 1:
     prompt = input("Enter your prompt: ")

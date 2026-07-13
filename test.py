@@ -1,9 +1,11 @@
-# pip install langchain-huggingface
-from langchain_huggingface import HuggingFaceEmbeddings
+import redis
 
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+r = redis.Redis(host="localhost", port = 6379, db = 0)
 
+print(r.ping())
 
-doc_vectors = embeddings.embed_documents(["First chunk of text", "Second chunk"])
+my_list = ["emb", "answer"]
 
-print(doc_vectors)
+r.rpush("question?",*my_list)
+
+print(r.lrange("question?", 0, 0))
