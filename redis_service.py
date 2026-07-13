@@ -1,13 +1,10 @@
 import json
 import uuid
 from cache_entry import CacheEntry
-from config import redis_client
-
-
 class RedisService():
     def __init__(self, client):
         self.client = client
-        self.status = redis_client.ping()
+        self.status = "Redis has connected successfully" if self.client.ping() else "There might be an issue, check the docker container ya baha!"
     
     def add_entry(self, entry : CacheEntry):
         cache_id = str(uuid.uuid4())
@@ -25,13 +22,16 @@ class RedisService():
     
     def get_entry(self, identifier : str):
         return self.client.get(identifier)
-
-
-
-testing = RedisService(client=redis_client)
-print(testing.status)
-test_entry = CacheEntry("hello?", [0,1,2], "baha?")
-id = testing.add_entry(test_entry)
-print(testing.get_entry(id))
-
-#this is a test for me to check if vim works
+    
+    def get_everything(self)->list:
+        entries = []
+        for key in self.client.scan_iter("cache:*"):
+            data = self.client.get(key)
+            if data:
+                entries.append(json.loads(data))
+        return entries
+    def get_size(self)->int:
+        return self.client.dbsize()
+    def empty_database(self):
+        self.client.flushall()
+        print("cleaned!")
