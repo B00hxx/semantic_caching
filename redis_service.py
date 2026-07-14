@@ -12,7 +12,8 @@ class RedisService():
         data = {
             "question" : entry.question,
             "embedding" : entry.embedding,
-            "answer" : entry.answer
+            "answer" : entry.answer,
+            "time" : str(entry.current_time)
         }
         self.client.set(
             f"cache:{cache_id}",

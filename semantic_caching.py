@@ -12,6 +12,7 @@ class SemanticCaching():
         self.threshold = threshold
         self.saved_answers = [] #made this into an instance's thingy coz then we can have a cache for each instance for different departmenets or use cases
         self.redis = RedisService(client = redis_client)
+    
     def get_answers(self, prompt:str)->dict:
         close_entries = []
         embedded = self.embedding.get_embedding(prompt)
@@ -29,13 +30,16 @@ class SemanticCaching():
             
             return {
                 "cache_hit" : False,
-                "answer" : answer_by_llm
+                "answer" : answer_by_llm,
+                "time" : entry.current_time
             }
+        
         else:
             close_entries.sort(key=lambda item: item[1], reverse=True)
             return {
                 "cache_hit" : True,
                 "similarity" : close_entries[0][1],
-                "answer" : close_entries[0][0]["answer"]
+                "answer" : close_entries[0][0]["answer"],
+                "time" : close_entries[0][0]["time"]
             }
         

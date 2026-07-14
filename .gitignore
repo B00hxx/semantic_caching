@@ -1,0 +1,92 @@
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ==========================
+# Environment variables
+# ==========================
+.env
+.env.*
+
+# ==========================
+# IDEs
+# ==========================
+.vscode/
+.idea/
+
+# ==========================
+# OS files
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Logs
+# ==========================
+*.log
+logs/
+
+# ==========================
+# Testing
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ==========================
+# Jupyter
+# ==========================
+.ipynb_checkpoints/
+
+# ==========================
+# Cache
+# ==========================
+.cache/
+
+# ==========================
+# Local databases
+# ==========================
+*.db
+*.sqlite
+*.sqlite3
+
+# ==========================
+# Redis dump
+# ==========================
+dump.rdb
+
+# ==========================
+# Model files (optional)
+# Uncomment if you don't want
+# to track large models
+# ==========================
+# models/
+# *.bin
+# *.gguf
+# *.onnx
+
+# ==========================
+# Temporary files
+# ==========================
+*.tmp
+*.bak
+*.swp
+*~
