@@ -9,14 +9,14 @@ testing.redis.empty_database()
 def process():
     prompt = input("what do u wanna know? ")
     data = testing.get_answers(prompt=prompt)
-    if data[0]:
+    if data["cache_hit"]:
         print("used the semantic caching")
         print("================================================")
-        print(data[1])
+        print(data["answer"])
     else:
         print("used the LLM")
         print("================================================")
-        print(data[1])
+        print(data["answer"])
 
 while True:
     process()
