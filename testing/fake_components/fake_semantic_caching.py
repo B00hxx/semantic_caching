@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from fake_embedding import FakeEmbedder
-from fake_llm import Fake_LLM
-from cache_entry import CacheEntry
-from cosine_sim import cosine_similarity
-from fake_redis import FakeRedisService
+from testing.fake_components.fake_embedding import FakeEmbedder
+from testing.fake_components.fake_llm import Fake_LLM
+from semantic_caching.cache_entry import CacheEntry
+from semantic_caching.cosine_sim import cosine_similarity
+from testing.fake_components.fake_redis import FakeRedisService
 
 class SemanticCaching():
     def __init__(self, llm_model : str = "fake_llm", embedding_model: str = "fake_emb", threshold : float = 0.5):
