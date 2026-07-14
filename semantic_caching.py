@@ -30,6 +30,7 @@ class SemanticCaching():
             
             return {
                 "cache_hit" : False,
+                "similarity" : None,
                 "answer" : answer_by_llm,
                 "time" : entry.current_time
             }

@@ -16,14 +16,17 @@ class FakeRedisService():
             "answer" : entry.answer,
             "time" : str(entry.current_time)
         }
-        self.storage[cache_id] = data
+        self.storage[f"cache:{cache_id}"] = data
         return f"cache:{cache_id}"
     
     def get_entry(self, identifier : str):
-        return self.storage[identifier]
+        return self.storage.get(identifier)
     
     def get_everything(self):
         return self.storage
     
     def get_size(self)->int:
         return len(self.storage)
+    
+    def empty_database(self):
+        self.storage.clear()

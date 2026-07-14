@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from fake_embedding import FakeEmbedder
 from fake_llm import Fake_LLM
 from cache_entry import CacheEntry
@@ -5,19 +8,19 @@ from cosine_sim import cosine_similarity
 from fake_redis import FakeRedisService
 
 class SemanticCaching():
-    def __init__(self, llm_model : str, embedding_model: str, threshold : float = 0.5):
+    def __init__(self, llm_model : str = "fake_llm", embedding_model: str = "fake_emb", threshold : float = 0.5):
         self.llm = Fake_LLM(llm_model)
         self.embedding = FakeEmbedder(embedding_model)
-        self.threshold = threshold
-        self.saved_answers = [] 
         self.redis = FakeRedisService()
-    
+        self.saved_answers = [] 
+        self.threshold = threshold
+
     def get_answers(self, prompt:str)->dict:
         close_entries = []
         embedded = self.embedding.get_embedding(prompt)
         self.saved_answers = self.redis.get_everything()
-        
-        for saved_entry in self.saved_answers:
+        print(self.saved_answers)
+        for saved_entry in self.saved_answers.values():
             similarity = cosine_similarity(embedded, saved_entry["embedding"])
             if similarity >= self.threshold:
                 close_entries.append([saved_entry, similarity])
@@ -29,6 +32,7 @@ class SemanticCaching():
             
             return {
                 "cache_hit" : False,
+                "similarity" : None,
                 "answer" : answer_by_llm,
                 "time" : entry.current_time
             }

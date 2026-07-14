@@ -6,11 +6,11 @@ class FakeEmbedder():
     
     def get_embedding(self, query : str)->np.array:
         if query == "hello!":
-            return np.array([1,2,3])
+            return np.array([1,0,0])
         elif query == "hi!":
-            return np.array([4,5,6])
+            return np.array([0.95, 0.05, 0.01])
         elif query == "baha":
-            return np.array([10,11,12])
-        fake_vect = np.array([7,8,9])
+            return np.array([0,1,0])
+        fake_vect = np.array([0,0,1])
         return fake_vect
     
