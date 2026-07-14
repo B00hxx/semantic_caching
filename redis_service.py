@@ -31,8 +31,10 @@ class RedisService():
             if data:
                 entries.append(json.loads(data))
         return entries
+    
     def get_size(self)->int:
         return self.client.dbsize()
+    
     def empty_database(self):
         self.client.flushall()
         print("cleaned!")

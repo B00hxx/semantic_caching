@@ -1,10 +1,10 @@
 import ollama
 import numpy as np
-from config import ollama_client, MODELS
+from config import ollama_client
 
 
 
-class embedder():
+class Embedder():
     def __init__(self, model):
         self.model = model
     def get_embedding(self, query : str)->np.array:

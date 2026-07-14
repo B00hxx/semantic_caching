@@ -1,14 +1,14 @@
 from llm_service import LLM
-from embedding import embedder
+from embedding import Embedder
 from cache_entry import CacheEntry
 from cosine_sim import cosine_similarity
 from redis_service import RedisService
 from config import redis_client
 
 class SemanticCaching():
-    def __init__(self, llm_model : LLM, embedding_model: embedder, threshold : float = 0.5):
+    def __init__(self, llm_model : LLM, embedding_model: Embedder, threshold : float = 0.5):
         self.llm = LLM(llm_model)
-        self.embedding = embedder(embedding_model)
+        self.embedding = Embedder(embedding_model)
         self.threshold = threshold
         self.saved_answers = [] #made this into an instance's thingy coz then we can have a cache for each instance for different departmenets or use cases
         self.redis = RedisService(client = redis_client)
