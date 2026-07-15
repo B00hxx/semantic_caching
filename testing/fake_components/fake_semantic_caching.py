@@ -1,6 +1,3 @@
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 from testing.fake_components.fake_embedding import FakeEmbedder
 from testing.fake_components.fake_llm import Fake_LLM
 from semantic_caching.cache_entry import CacheEntry

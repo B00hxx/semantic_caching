@@ -1,6 +1,6 @@
 import json
 import uuid
-from cache_entry import CacheEntry
+from testing.fake_components.cache_entry import CacheEntry
 
 
 class FakeRedisService():

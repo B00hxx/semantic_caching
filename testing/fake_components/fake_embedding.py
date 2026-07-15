@@ -11,6 +11,8 @@ class FakeEmbedder():
             return np.array([0.95, 0.05, 0.01])
         elif query == "baha":
             return np.array([0,1,0])
-        fake_vect = np.array([0,0,1])
+        elif query == "random":
+            return np.array([0.3, np.sqrt(0.91), 0])
+        fake_vect = np.random.rand(3)
         return fake_vect
     
