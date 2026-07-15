@@ -31,8 +31,8 @@ def test_true_positive(create_semantic_layer):
     create_semantic_layer.get_answers("hi!")
     assert create_semantic_layer.llm.calls == 1
 
-def test_false_call(create_very_small_semantic_layer):
-    """the 2 words are not the same semantically but their embedding is close so for a small thrsshold we end up getting a hit on the LLM which is the wrong behavior"""
+def test_false_cache_hit(create_very_small_semantic_layer):
+    """the 2 words are not the same semantically but their embedding is close so for a small thrsshold we end up getting a respinse from the cache which is the wrong behavior"""
     create_very_small_semantic_layer.get_answers("hello!")
     assert create_very_small_semantic_layer.llm.calls == 1
     create_very_small_semantic_layer.get_answers("random")
