@@ -16,7 +16,7 @@ def test_responses(create_llm, query, expected):
     assert create_llm.get_answer(query) == expected
 
 
-def testing_calls():
+def test_calls():
     fake_llm_instance = Fake_LLM()
     for i in range(10):
         test = fake_llm_instance.get_answer("hello!")
