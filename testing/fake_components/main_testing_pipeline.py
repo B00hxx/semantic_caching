@@ -1,4 +1,4 @@
-from fake_semantic_caching import SemanticCaching
+from testing.fake_components.fake_semantic_caching import SemanticCaching
 from timing import timer_decorator
 
 testing = SemanticCaching()

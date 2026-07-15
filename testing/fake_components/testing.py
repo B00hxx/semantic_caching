@@ -1,5 +1,5 @@
 import pytest
-from fake_semantic_caching import SemanticCaching
+from testing.fake_components.fake_semantic_caching import SemanticCaching
 
 def test_empty_cache_calls_llm():
 
