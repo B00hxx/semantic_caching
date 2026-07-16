@@ -1,6 +1,6 @@
 import json
 import uuid
-from cache_entry import CacheEntry
+from .cache_entry import CacheEntry
 class RedisService():
     def __init__(self, client):
         self.client = client

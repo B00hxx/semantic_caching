@@ -1,5 +1,5 @@
 from testing.fake_components.fake_semantic_caching import SemanticCaching
-from timing import timer_decorator
+from semantic_caching.timing import timer_decorator
 
 testing = SemanticCaching()
 testing.redis.empty_database()

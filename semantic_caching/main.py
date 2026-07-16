@@ -1,6 +1,6 @@
-from config import MODELS
-from semantic_caching import SemanticCaching
-from timing import timer_decorator
+from .config import MODELS
+from .semantic_caching import SemanticCaching
+from .timing import timer_decorator
 
 testing = SemanticCaching(MODELS["chat"], MODELS["emb"], 0.9)
 testing.redis.empty_database()
@@ -24,6 +24,6 @@ def process():
         print(data["answer"])
         print("================================================")
 
-
-while True:
-    process()
+if __name__ == "__main__":
+    while True:
+        process()
