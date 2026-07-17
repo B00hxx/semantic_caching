@@ -1,14 +1,15 @@
 import json
 import uuid
-from .cache_entry import CacheEntry
-class RedisService():
-    def __init__(self, client):
+from ..cache_entry import CacheEntry
+from .vector_store_services import VectorStore
+from redis import Redis
+class RedisService(VectorStore):
+    def __init__(self, client : Redis):
         self.client = client
         self.status = "Redis has connected successfully" if self.client.ping() else "There might be an issue, check the docker container ya baha!"
     
     def add_entry(self, entry : CacheEntry):
         cache_id = str(uuid.uuid4())
-        print(cache_id)
         data = {
             "question" : entry.question,
             "embedding" : entry.embedding,

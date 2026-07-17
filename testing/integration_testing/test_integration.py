@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 from semantic_caching.config import MODELS
-from semantic_caching.llm_service import LLM
-from semantic_caching.embedding import Embedder
+from semantic_caching.llm_services.llm_service import LLM
+from semantic_caching.embedding_services.embedding_service import Embedder
 from semantic_caching.cosine_sim import cosine_similarity
 from semantic_caching.semantic_caching import SemanticCaching
 
