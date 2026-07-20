@@ -13,6 +13,8 @@ class RedisService(VectorStore):
         self.client = client
         self.status = "Redis has connected successfully" if self.client.ping() else "There might be an issue, check the docker container ya baha!"
         self.dimension = dimension
+        self.create_index()
+
     def create_index(self):
         schema = (
             VectorField(
@@ -31,10 +33,13 @@ class RedisService(VectorStore):
             prefix=["cache:"],
             index_type=IndexType.HASH
         )
-        self.client.ft("cache_index").create_index(
-            schema,
-            definition=definition
-        )
+        try:
+            self.client.ft("cache_index").create_index(
+                schema,
+                definition=definition
+            )
+        except Exception:
+            pass
 
     def add_entry(self, entry : CacheEntry):
         cache_id = f"cache:{str(uuid.uuid4())}" 
@@ -52,17 +57,14 @@ class RedisService(VectorStore):
     def get_entry(self, identifier : str):
         return self.client.hgetall(identifier)
     
-    def get_size(self)->int:
-        return self.client.dbsize()
-
-    def get_everything(self)->list:
-        entries = []
-        for key in self.client.scan_iter("cache:*"):
-            data = self.client.get(key)
-            if data:
-                entries.append(json.loads(data))
-        return entries
+    def get_size(self) -> int:
+        return sum(1 for _ in self.client.scan_iter(match="cache:*"))
     
-    def empty_database(self):
+    def empty_database(self)->None:
         self.client.flushall()
         print("cleaned!")
+        return None
+    def search(self, query : str):
+        pass
+    
+    

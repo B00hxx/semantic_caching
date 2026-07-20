@@ -9,9 +9,6 @@ class VectorStore(ABC):
     def get_entry(self, identifier : str):
         """Abstract method to retrieve an entry from vector store"""
         pass
-    def get_everything(self) -> list:
-        """Method to get the entire stored cache"""
-        pass
     def get_size(self) -> int:
         """Method to get the size of cache"""
         pass
