@@ -10,7 +10,7 @@ testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
 testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
 testing_redis = RedisService(client=redis_client, dimension=1024)
 
-testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.999)
+testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.8)
 
 testing.vector_store.empty_database()
 
@@ -23,16 +23,17 @@ def process():
     if data["cache_hit"]:
         print("used the semantic caching")
         print("================================================")
-        print(data["cosine_distance"])
-        print(data["time"])
-        print(data["answer"])
+        print(f"the similarity is basically {data["cosine_distance"]}")
+        print(f"this was created at {data["time"]}")
+        print(f"this answer still works for {testing.vector_store.ttl(data["id"])}")
+        print(f"the answer is {data["answer"]}")
         print("================================================")
 
     else:
         print("used the LLM")
         print("================================================")
-        print(data["time"])
-        print(data["answer"])
+        print(f"this was created at {data["time"]}")
+        print(f"the answer is {data["answer"]}")
         print("================================================")
 
 if __name__ == "__main__":

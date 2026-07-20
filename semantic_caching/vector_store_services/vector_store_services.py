@@ -19,5 +19,8 @@ class VectorStore(ABC):
     def search(self, query_embedding, threshold : float) -> VectorSearchResult:
         """Searching through the vector db for closest match"""
         pass
+    def ttl(self, identifier : str):
+        """Method to get back the time to live of an entry"""
+        pass
 
 

@@ -22,13 +22,15 @@ class SemanticCaching():
                 "cache_hit" : False,
                 "cosine_distance" : None,
                 "answer" : answer_by_llm,
-                "time" : entry.current_time
+                "time" : entry.created_at
             }
         else:
+
             return {
                 "cache_hit" : True,
                 "cosine_distance" : response_from_vector_store.score,
                 "answer" : response_from_vector_store.answer,
-                "time" : response_from_vector_store.time
+                "time" : response_from_vector_store.time,
+                "id" : response_from_vector_store.identifier
             }
         

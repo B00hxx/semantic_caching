@@ -50,9 +50,11 @@ class RedisService(VectorStore):
                 "question" : entry.question,
                 "embedding" : entry.embedding.astype(np.float32).tobytes(),
                 "answer" : entry.answer,
-                "time" : str(entry.current_time)
+                "time" : str(entry.created_at),
+                "ttl" : entry.ttl_seconds
             }
         )
+        self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
     
     def get_entry(self, identifier : str):
@@ -83,10 +85,11 @@ class RedisService(VectorStore):
                 question=result.question,
                 score=float(result.score),
                 identifier=result.id,
-                time=result.time
+                time=result.time,
             )
             return vector_search_result
         return None
-
+    def ttl(self, identifier : str):
+        return self.client.ttl(identifier)
 
     
