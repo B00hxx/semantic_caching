@@ -21,7 +21,7 @@ def create_ollama_embedding():
 
 @pytest.fixture
 def create_redis_store():
-    return RedisService(client=redis_client)
+    return RedisService(client=redis_client, dimension=1024)
 
 @pytest.fixture
 def create_pipeline(create_ollama_llm ,create_ollama_embedding, create_redis_store):

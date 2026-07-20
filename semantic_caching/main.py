@@ -8,9 +8,10 @@ from .llm_services.ollama_service import OllamaLLM
 
 testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
 testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
-testing_redis = RedisService(client=redis_client)
+testing_redis = RedisService(client=redis_client, dimension=1024)
 
-testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.7)
+testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.999)
+
 testing.vector_store.empty_database()
 
 
@@ -22,7 +23,7 @@ def process():
     if data["cache_hit"]:
         print("used the semantic caching")
         print("================================================")
-        print(data["similarity"])
+        print(data["cosine_distance"])
         print(data["time"])
         print(data["answer"])
         print("================================================")

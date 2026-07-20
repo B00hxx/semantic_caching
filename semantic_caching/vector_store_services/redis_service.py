@@ -6,6 +6,8 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from ..cache_entry import CacheEntry
 from .vector_store_services import VectorStore
+from .vector_search_result import VectorSearchResult
+
 
 class RedisService(VectorStore):
     def __init__(self, client : redis.Redis, dimension : int):
@@ -37,8 +39,8 @@ class RedisService(VectorStore):
                 schema,
                 definition=definition
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print("INDEX CREATION ERROR BRR:", e)
 
     def add_entry(self, entry : CacheEntry):
         cache_id = f"cache:{str(uuid.uuid4())}" 
@@ -60,23 +62,30 @@ class RedisService(VectorStore):
         return sum(1 for _ in self.client.scan_iter(match="cache:*"))
     
     def empty_database(self)->None:
-        self.client.flushall()
-        print("cleaned!")
-        return None
+        for key in self.client.scan_iter(match="cache:*"):
+            self.client.delete(key)
+        print("cleared!")
     
     def search(self, query_embedding : np.ndarray, threshold : float):
-        query = (Query("*=>[KNN 1 @embedding $vec AS score]").sort_by("score").return_fields("question", "answer", "score").dialect(2))
+        query = (Query("*=>[KNN 1 @embedding $vec AS score]").sort_by("score").return_fields("question", "answer", "score", "time").dialect(2))
         results = self.client.ft("cache_index").search(
             query,
             {
                 "vec": query_embedding.astype(np.float32).tobytes()
             }
         )
-        result = results.docs[0]
         if not results.docs:
             return None
-        if float(result.score) <= threshold:
-            return result
+        result = results.docs[0]
+        if float(result.score) <= 1-threshold:
+            vector_search_result = VectorSearchResult(
+                answer=result.answer,
+                question=result.question,
+                score=float(result.score),
+                identifier=result.id,
+                time=result.time
+            )
+            return vector_search_result
         return None
 
 

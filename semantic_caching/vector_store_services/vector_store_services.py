@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from .vector_search_result import VectorSearchResult
 from semantic_caching.cache_entry import CacheEntry
 
 class VectorStore(ABC):
@@ -14,6 +15,9 @@ class VectorStore(ABC):
         pass
     def empty_database(self):
         """Method to lowkey drop table"""
+        pass
+    def search(self, query_embedding, threshold : float) -> VectorSearchResult:
+        """Searching through the vector db for closest match"""
         pass
 
 
