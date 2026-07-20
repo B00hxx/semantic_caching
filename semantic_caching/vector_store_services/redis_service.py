@@ -1,8 +1,7 @@
 import redis
-import json
 import uuid
 import numpy as np
-from redis.commands.search.field import TagField, VectorField
+from redis.commands.search.field import VectorField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from ..cache_entry import CacheEntry
@@ -64,7 +63,21 @@ class RedisService(VectorStore):
         self.client.flushall()
         print("cleaned!")
         return None
-    def search(self, query : str):
-        pass
     
+    def search(self, query_embedding : np.ndarray, threshold : float):
+        query = (Query("*=>[KNN 1 @embedding $vec AS score]").sort_by("score").return_fields("question", "answer", "score").dialect(2))
+        results = self.client.ft("cache_index").search(
+            query,
+            {
+                "vec": query_embedding.astype(np.float32).tobytes()
+            }
+        )
+        result = results.docs[0]
+        if not results.docs:
+            return None
+        if float(result.score) <= threshold:
+            return result
+        return None
+
+
     
