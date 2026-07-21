@@ -1,9 +1,22 @@
-from .config import MODELS, redis_client, ollama_client
-from .semantic_caching import SemanticCaching
-from .timing import timer_decorator
-from .vector_store_services.redis_service import RedisService
-from .embedding_services.ollama_embedding import OllamaEmbeddingModel
-from .llm_services.ollama_service import OllamaLLM
+from config import Settings
+from semantic_caching.semantic_caching import SemanticCaching
+from semantic_caching.llm_services.ollama_service import OllamaLLM
+from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
+from semantic_caching.vector_store_services.redis_service import RedisService
+from semantic_caching.timing import timer_decorator
+
+
+MODELS = {
+    "chat" : "qwen2.5:0.5b",
+    "emb" : "qwen3-embedding:0.6b"
+}
+
+
+
+settings = Settings()
+
+redis_client = settings.redis_client.get_client()
+ollama_client = settings.ollama_client.get_client()
 
 
 testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
@@ -12,7 +25,6 @@ testing_redis = RedisService(client=redis_client, dimension=1024)
 
 testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.8)
 
-testing.vector_store.empty_database()
 
 
 
@@ -37,5 +49,6 @@ def process():
         print("================================================")
 
 if __name__ == "__main__":
+    testing.vector_store.empty_database()
     while True:
         process()

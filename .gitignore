@@ -120,3 +120,6 @@ htmlcov/
 
 #to ignore all csv files
 *.csv
+
+
+.env

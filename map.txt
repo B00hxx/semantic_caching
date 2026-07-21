@@ -1,6 +1,18 @@
 .
+├── API
+│   ├── app.py
+│   ├── config.py
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   └── main.cpython-314.pyc
+│   └── routes.py
 ├── benchmark
+│   ├── datasets
+│   │   └── train.csv
 │   └── worker.py
+├── config.py
+├── __init__.py
+├── main.py
 ├── map.txt
 ├── __pycache__
 │   ├── cache_entry.cpython-314.pyc
@@ -8,15 +20,14 @@
 │   ├── cosine_sim.cpython-314.pyc
 │   ├── embedding.cpython-314.pyc
 │   ├── llm_service.cpython-314.pyc
+│   ├── main.cpython-314.pyc
 │   ├── redis_service.cpython-314.pyc
 │   ├── semantic_caching.cpython-314.pyc
 │   └── timing.cpython-314.pyc
-├── random_test.py
 ├── requirements.txt
 ├── semantic_caching
 │   ├── cache_entry.py
 │   ├── config.py
-│   ├── cosine_sim.py
 │   ├── embedding_services
 │   │   ├── embedding_service.py
 │   │   ├── __init__.py
@@ -28,7 +39,6 @@
 │   │   ├── llm_service.py
 │   │   ├── ollama_service.py
 │   │   └── __pycache__
-│   ├── main.py
 │   ├── __pycache__
 │   │   ├── cache_entry.cpython-314.pyc
 │   │   ├── config.cpython-314.pyc
@@ -49,30 +59,29 @@
 │       ├── vector_search_result.py
 │       └── vector_store_services.py
 ├── start.sh
-├── testing
-│   ├── fake_components
-│   │   ├── cache_entry.py
-│   │   ├── fake_embedding.py
-│   │   ├── fake_llm.py
-│   │   ├── fake_redis.py
-│   │   ├── fake_semantic_caching.py
-│   │   ├── __init__.py
-│   │   ├── main_testing_pipeline.py
-│   │   ├── __pycache__
-│   │   └── testing.py
-│   ├── __init__.py
-│   ├── integration_testing
-│   │   ├── __init__.py
-│   │   ├── __pycache__
-│   │   └── test_integration.py
-│   ├── __pycache__
-│   │   └── __init__.cpython-314.pyc
-│   └── unit_tests
-│       ├── __init__.py
-│       ├── __pycache__
-│       ├── test_fake_llm.py
-│       ├── test_fake_redis.py
-│       └── test_semantic_caching.py
-└── train.csv
+└── testing
+    ├── fake_components
+    │   ├── cache_entry.py
+    │   ├── fake_embedding.py
+    │   ├── fake_llm.py
+    │   ├── fake_redis.py
+    │   ├── fake_semantic_caching.py
+    │   ├── __init__.py
+    │   ├── main_testing_pipeline.py
+    │   ├── __pycache__
+    │   └── testing.py
+    ├── __init__.py
+    ├── integration_testing
+    │   ├── __init__.py
+    │   ├── __pycache__
+    │   └── test_integration.py
+    ├── __pycache__
+    │   └── __init__.cpython-314.pyc
+    └── unit_tests
+        ├── __init__.py
+        ├── __pycache__
+        ├── test_fake_llm.py
+        ├── test_fake_redis.py
+        └── test_semantic_caching.py
 
-19 directories, 57 files
+22 directories, 63 files

@@ -1,4 +1,3 @@
-from ..config import ollama_client
 from abc import ABC, abstractmethod
 
 class LLM(ABC):
