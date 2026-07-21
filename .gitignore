@@ -117,3 +117,6 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
+
+#to ignore all csv files
+*.csv
