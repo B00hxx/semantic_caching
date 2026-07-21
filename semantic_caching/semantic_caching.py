@@ -22,7 +22,7 @@ class SemanticCaching():
                 "cache_hit" : False,
                 "cosine_distance" : None,
                 "answer" : answer_by_llm,
-                "time" : entry.created_at
+                "time" : entry.created_at            
             }
         else:
 

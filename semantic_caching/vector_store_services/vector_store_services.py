@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from .vector_search_result import VectorSearchResult
-from semantic_caching.cache_entry import CacheEntry
+#from cache_entry import CacheEntry
 
 class VectorStore(ABC):
     @abstractmethod
-    def add_entry(self, entry : CacheEntry):
+    def add_entry(self, entry):
         """Abstract method to add entries to vector store"""
         pass
     @abstractmethod

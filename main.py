@@ -1,4 +1,4 @@
-from config import Settings
+from config import settings
 from semantic_caching.semantic_caching import SemanticCaching
 from semantic_caching.llm_services.ollama_service import OllamaLLM
 from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
@@ -13,7 +13,6 @@ MODELS = {
 
 
 
-settings = Settings()
 
 redis_client = settings.redis_client.get_client()
 ollama_client = settings.ollama_client.get_client()
