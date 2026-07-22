@@ -123,3 +123,5 @@ htmlcov/
 
 
 .env
+
+*.json
