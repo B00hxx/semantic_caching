@@ -31,6 +31,7 @@ class SemanticCaching():
                 "cosine_distance" : response_from_vector_store.score,
                 "answer" : response_from_vector_store.answer,
                 "time" : response_from_vector_store.time,
-                "id" : response_from_vector_store.identifier
+                "id" : response_from_vector_store.identifier,
+                "ttl" : response_from_vector_store.ttl
             }
         

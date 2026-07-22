@@ -1,7 +1,73 @@
-class worker:
-    def __init__(self, id : int):
-        self.id = id
-    def asks(self, query):
-        pass
-#I kinda need to expose my architecture as an API and then 
-#simulate the whole thing
+import asyncio
+import time
+from typing import Any, Dict, List
+import httpx
+
+
+class Worker:
+
+    def __init__(self, worker_id: int, timeout: float = 100000.0):
+        # 1. Attribute name aligned with method usage
+        self.worker_id = worker_id
+        self.timeout = httpx.Timeout(timeout)
+
+    async def _send_request(
+        self, client: httpx.AsyncClient, link: str, question: str
+    ) -> Dict[str, Any]:
+        start = time.perf_counter()
+        try:
+            response = await client.post(link, json={"query": question})
+            latency = time.perf_counter() - start
+
+            if response.status_code == 200:
+                # 2. Extract JSON body before using dict .get()
+                data = response.json()
+                return {
+                    "worker_id": self.worker_id,
+                    "query": question,
+                    "status_code": 200,
+                    "latency_sec": latency,
+                    "cache_hit": data.get("cache_hit", False),
+                    "cosine_distance": data.get("cosine_distance"),
+                    "answer": data.get("answer"),
+                    "error": None,
+                }
+            else:
+                return {
+                    "worker_id": self.worker_id,
+                    "query": question,
+                    "status_code": response.status_code,
+                    "latency_sec": latency,
+                    "cache_hit": False,
+                    "error": response.text,
+                }
+        except Exception as e:
+            latency = time.perf_counter() - start
+            return {
+                "worker_id": self.worker_id,
+                "query": question,
+                "status_code": None,  # 3. None instead of 500 (since no response was received)
+                "latency_sec": latency,
+                "cache_hit": False,
+                "error": str(e),
+            }
+
+    async def asks(
+        self,
+        link: str,
+        questions: List[str],  # 4. Corrected syntax from '=' to ':'
+        concurrent: bool = False,  # 5. Fixed spelling typo
+    ) -> List[Dict[str, Any]]:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            if concurrent:
+                tasks = [
+                    self._send_request(client, link, q) for q in questions
+                ]
+                return list(await asyncio.gather(*tasks))
+            else:
+                # 6. Added fallback loop for non-concurrent execution
+                results = []
+                for q in questions:
+                    res = await self._send_request(client, link, q)
+                    results.append(res)
+                return results

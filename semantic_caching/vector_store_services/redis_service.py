@@ -83,9 +83,10 @@ class RedisService(VectorStore):
             vector_search_result = VectorSearchResult(
                 answer=result.answer,
                 question=result.question,
-                score=float(result.score),
+                score=1-float(result.score),
                 identifier=result.id,
                 time=result.time,
+                ttl=self.ttl(result.id)
             )
             return vector_search_result
         return None

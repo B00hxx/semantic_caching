@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from ..config import settings
@@ -5,6 +6,7 @@ from ..semantic_caching.semantic_caching import SemanticCaching
 from ..semantic_caching.llm_services.ollama_service import OllamaLLM
 from ..semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
 from ..semantic_caching.vector_store_services.redis_service import RedisService
+from dotenv import load_dotenv
 
 
 MODELS = {
@@ -27,6 +29,10 @@ async def lifespan(app : FastAPI):
     print("Started the pipeline with success!")
     
     yield
-    
-    app.state.semantic_caching_service.vector_store.empty_database()
-    print("The database is clear!")
+    load_dotenv()
+    feature_flag = (os.getenv("DELETE_ON_SHUTDOWN").lower() == "true")
+    if feature_flag:
+        app.state.semantic_caching_service.vector_store.empty_database()
+        print("The database is clear!")
+    else:
+        print("keeping the database!")
