@@ -1,4 +1,4 @@
-from ...semantic_caching.embedding_services.embedding_service import Embedder
+from semantic_caching.embedding_services.embedding_service import Embedder
 import numpy as np
 
 class FakeEmbedder(Embedder):

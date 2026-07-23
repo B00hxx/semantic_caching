@@ -1,20 +1,14 @@
 import pytest
-from testing.fake_components.fake_semantic_caching import SemanticCaching
-
-@pytest.fixture
-def create_semantic_layer():
-    return SemanticCaching()
+from semantic_caching.semantic_caching import SemanticCaching
+from fake_components.settings import fake_redis_service, fake_llm_service, fake_embedding_service
 
 @pytest.fixture
 def create_selective_semantic_layer():
-    return SemanticCaching(threshold=0.9)
+    return SemanticCaching(llm_model=fake_llm_service, embedding_model=fake_embedding_service, vector_store=fake_redis_service, threshold=0.9)
 
 @pytest.fixture
-def create_very_small_semantic_layer():
-    return SemanticCaching(threshold=0.29)
-
-def test_basic(create_semantic_layer):
-    assert create_semantic_layer.saved_answers == []
+def create_non_selective_semantic_layer():
+    return SemanticCaching(llm_model=fake_llm_service, embedding_model=fake_embedding_service, vector_store=fake_redis_service, threshold=0.3)
 
 def test_semantic_pipeline(create_semantic_layer):
     answer_dict = create_semantic_layer.get_answers("hello")

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from .vector_search_result import VectorSearchResult
-#from cache_entry import CacheEntry
 
 class VectorStore(ABC):
     @abstractmethod
