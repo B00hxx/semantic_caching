@@ -5,22 +5,18 @@ import httpx
 
 
 class Worker:
-
     def __init__(self, worker_id: int, timeout: float = 100000.0):
-        # 1. Attribute name aligned with method usage
         self.worker_id = worker_id
         self.timeout = httpx.Timeout(timeout)
 
     async def _send_request(
-        self, client: httpx.AsyncClient, link: str, question: str
-    ) -> Dict[str, Any]:
+        self, client: httpx.AsyncClient, link: str, question: str) -> Dict[str, Any]:
         start = time.perf_counter()
         try:
             response = await client.post(link, json={"query": question})
             latency = time.perf_counter() - start
 
             if response.status_code == 200:
-                # 2. Extract JSON body before using dict .get()
                 data = response.json()
                 return {
                     "worker_id": self.worker_id,
@@ -46,18 +42,13 @@ class Worker:
             return {
                 "worker_id": self.worker_id,
                 "query": question,
-                "status_code": None,  # 3. None instead of 500 (since no response was received)
+                "status_code": None,
                 "latency_sec": latency,
                 "cache_hit": False,
                 "error": str(e),
             }
 
-    async def asks(
-        self,
-        link: str,
-        questions: List[str],  # 4. Corrected syntax from '=' to ':'
-        concurrent: bool = False,  # 5. Fixed spelling typo
-    ) -> List[Dict[str, Any]]:
+    async def asks(self, link: str, questions: List[str], concurrent: bool = False) -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             if concurrent:
                 tasks = [
@@ -65,7 +56,6 @@ class Worker:
                 ]
                 return list(await asyncio.gather(*tasks))
             else:
-                # 6. Added fallback loop for non-concurrent execution
                 results = []
                 for q in questions:
                     res = await self._send_request(client, link, q)

@@ -1,8 +1,10 @@
-class Fake_LLM():
+from ...semantic_caching.llm_services.llm_service import LLM
+
+class Fake_LLM(LLm):
     def __init__(self, model = "fake_llm"):
         self.model = model
         self.calls = 0
-    def get_answer(self, query):
+    def generate(self, query):
         self.calls += 1
         if query == "hello!":
             return "what do you want?"
@@ -10,5 +12,5 @@ class Fake_LLM():
             return "here we go"
         elif query == "baha":
             return "he's the man"
-        return "fake anwswer"
-
+        elif query == "random":
+            return "idk what to say"
