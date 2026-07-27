@@ -5,7 +5,7 @@ class FakeEmbedder(Embedder):
     def __init__(self, model="fake_emb"):
         self.model = model
     
-    def embed(self, query: str) -> np.ndarray:
+    async def embed(self, query: str) -> np.ndarray:
         query_lower = query.lower().strip()
         embedding_map = {
             "hello": np.array([1.0, 0.0, 0.0]),           
@@ -17,5 +17,4 @@ class FakeEmbedder(Embedder):
         
         if query_lower in embedding_map:
             return embedding_map[query_lower]
-        else:
-            return np.array([0.5, 0.5, 0.0])
+        return np.array([0.5, 0.5, 0.0])

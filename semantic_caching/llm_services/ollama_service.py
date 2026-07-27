@@ -1,5 +1,6 @@
 import ollama
 from .llm_service import LLM
+import asyncio
 
 class OllamaLLM(LLM):
     def __init__(self, client, model_name:str):
@@ -7,9 +8,9 @@ class OllamaLLM(LLM):
         self.model_name = model_name
         self.calls = 0
     
-    def generate(self, query : str):
+    async def generate(self, query : str):
         self.calls += 1
-        response = self.client.chat(
+        response = await self.client.chat(
             model=self.model_name,
             messages=[
                     {'role': 'user', 'content': query}

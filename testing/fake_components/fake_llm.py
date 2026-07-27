@@ -4,7 +4,7 @@ class FakeLLM(LLM):
     def __init__(self, model = "fake_llm"):
         self.model = model
         self.calls = 0
-    def generate(self, query):
+    async def generate(self, query):
         self.calls += 1
         responses = {
             "hello": "what do you want?",

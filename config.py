@@ -1,4 +1,4 @@
-import redis
+import redis.asyncio as redis
 import ollama
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -22,8 +22,8 @@ class RedisSettings(BaseModel):
 class OllamaSettings(BaseModel):
     host : str = 'http://localhost:11434'
 
-    def get_client(self) -> ollama.Client:
-        return ollama.Client(
+    def get_client(self) -> ollama.AsyncClient:
+        return ollama.AsyncClient(
             host = self.host
         )
 

@@ -13,7 +13,7 @@ class FakeRedisService(VectorStore):
         self.dimension = dimension
         self.status = "Redis has connected successfully"
 
-    def add_entry(self, entry : CacheEntry):
+    async def add_entry(self, entry : CacheEntry):
         cache_id = f"cache:{str(uuid.uuid4())}"
 
         data = {
@@ -24,20 +24,20 @@ class FakeRedisService(VectorStore):
             "ttl" : entry.ttl_seconds
         }
 
-        self.client.hset(key=cache_id, mapping=data)
+        await self.client.hset(key=cache_id, mapping=data)
 
         return cache_id
+
+    async def get_entry(self, identifier : str):
+        return await self.client.hgetall(key = identifier)
     
-    def get_entry(self, identifier : str):
-        return self.client.hgetall(key = identifier)
-    
-    def get_size(self)->int:
+    async def get_size(self)->int:
         return len(self.client.storage.keys())
     
-    def empty_database(self):
+    async def empty_database(self):
         self.client.storage.clear()
 
-    def search(self, query_embedding : ndarray, threshold : float):
+    async  def search(self, query_embedding : ndarray, threshold : float):
         max : float = 0.0
         key_to_return : str = ""
         for key in self.client.storage.keys():
@@ -59,5 +59,5 @@ class FakeRedisService(VectorStore):
         return vector_search_result
     
 
-    def ttl(self, identifier : str):
-        return self.client.storage[identifier]["ttl"]
+    async def ttl(self, identifier : str):
+        return await self.client.ttl(key=identifier)

@@ -1,6 +1,6 @@
-import redis
 import uuid
 import numpy as np
+import redis.asyncio as redis
 from redis.commands.search.field import VectorField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
@@ -10,87 +10,109 @@ from .vector_search_result import VectorSearchResult
 
 
 class RedisService(VectorStore):
-    def __init__(self, client : redis.Redis, dimension : int):
+    def __init__(self, client: redis.Redis, dimension: int):
         self.client = client
-        self.status = "Redis has connected successfully" if self.client.ping() else "There might be an issue, check the docker container ya baha!"
+        self.status = "Not initialized yet!"
         self.dimension = dimension
-        self.create_index()
+        # Removed self.create_index() because __init__ cannot await async functions
 
-    def create_index(self):
+    async def initialize(self) -> None:
+        """Call this method in lifespan after creating the RedisService instance."""
+        try:
+            if await self.client.ping():
+                self.status = "Redis has connected successfully"
+        except Exception as e:
+            self.status = f"Redis connection issue: {e}"
+            
+        await self.create_index()
+
+    async def create_index(self):
         schema = (
             VectorField(
                 "embedding",
                 "HNSW",
                 {
-                    "TYPE" : "FLOAT32",
-                    "DIM" : self.dimension,
-                    "DISTANCE_METRIC" : "COSINE",
+                    "TYPE": "FLOAT32",
+                    "DIM": self.dimension,
+                    "DISTANCE_METRIC": "COSINE",
                     "M": 16,
                     "EF_CONSTRUCTION": 200
                 }
-            )
+            ),
         )
         definition = IndexDefinition(
             prefix=["cache:"],
             index_type=IndexType.HASH
         )
         try:
-            self.client.ft("cache_index").create_index(
+            # Awaited async index creation
+            await self.client.ft("cache_index").create_index(
                 schema,
                 definition=definition
             )
         except Exception as e:
-            print("INDEX CREATION ERROR BRR:", e)
+            print("INDEX CREATION LOG:", e)
 
-    def add_entry(self, entry : CacheEntry):
+    async def add_entry(self, entry: CacheEntry) -> str:
         cache_id = f"cache:{str(uuid.uuid4())}" 
-        self.client.hset(
+        await self.client.hset(
             cache_id,
             mapping={
-                "question" : entry.question,
-                "embedding" : entry.embedding.astype(np.float32).tobytes(),
-                "answer" : entry.answer,
-                "time" : str(entry.created_at),
-                "ttl" : entry.ttl_seconds
+                "question": entry.question,
+                "embedding": entry.embedding.astype(np.float32).tobytes(),
+                "answer": entry.answer,
+                "time": str(entry.created_at),
+                "ttl": entry.ttl_seconds
             }
         )
-        self.client.expire(cache_id, entry.ttl_seconds)
+        await self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
     
-    def get_entry(self, identifier : str):
-        return self.client.hgetall(identifier)
+    async def get_entry(self, identifier: str):
+        return await self.client.hgetall(identifier)
     
-    def get_size(self) -> int:
-        return sum(1 for _ in self.client.scan_iter(match="cache:*"))
+    async def get_size(self) -> int:
+        count = 0
+        async for _ in self.client.scan_iter(match="cache:*"):
+            count += 1
+        return count
     
-    def empty_database(self)->None:
-        for key in self.client.scan_iter(match="cache:*"):
-            self.client.delete(key)
-        print("cleared!")
+    async def empty_database(self) -> None:
+        keys = [key async for key in self.client.scan_iter(match="cache:*")]
+        if keys:
+            await self.client.delete(*keys)
+        print(f"Cleared {len(keys)} cache keys!")
     
-    def search(self, query_embedding : np.ndarray, threshold : float):
-        query = (Query("*=>[KNN 1 @embedding $vec AS score]").sort_by("score").return_fields("question", "answer", "score", "time").dialect(2))
-        results = self.client.ft("cache_index").search(
+    async def search(self, query_embedding: np.ndarray, threshold: float):
+        query = (
+            Query("*=>[KNN 1 @embedding $vec AS score]")
+            .sort_by("score")
+            .return_fields("question", "answer", "score", "time")
+            .dialect(2)
+        )
+        results = await self.client.ft("cache_index").search(
             query,
-            {
+            query_params={
                 "vec": query_embedding.astype(np.float32).tobytes()
             }
         )
         if not results.docs:
             return None
+            
         result = results.docs[0]
-        if float(result.score) <= 1-threshold:
+        score = float(result.score)
+        
+        if score <= 1 - threshold:
             vector_search_result = VectorSearchResult(
                 answer=result.answer,
                 question=result.question,
-                score=1-float(result.score),
+                score=1 - score,
                 identifier=result.id,
                 time=result.time,
-                ttl=self.ttl(result.id)
+                ttl=await self.ttl(result.id)
             )
             return vector_search_result
         return None
-    def ttl(self, identifier : str):
-        return self.client.ttl(identifier)
 
-    
+    async def ttl(self, identifier: str):
+        return await self.client.ttl(identifier)

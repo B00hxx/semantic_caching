@@ -22,17 +22,21 @@ async def lifespan(app : FastAPI):
     testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
     testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
     testing_redis = RedisService(client=redis_client, dimension=1024)
+    await testing_redis.initialize()
 
     testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.8)
     
     app.state.semantic_caching_service = testing
+
+    app.state.redis_client = redis_client
     print("Started the pipeline with success!")
     
     yield
     load_dotenv()
     feature_flag = (os.getenv("DELETE_ON_SHUTDOWN").lower() == "true")
     if feature_flag:
-        app.state.semantic_caching_service.vector_store.empty_database()
+        await app.state.semantic_caching_service.vector_store.empty_database()
         print("The database is clear!")
     else:
         print("keeping the database!")
+    await redis_client.aclose()
