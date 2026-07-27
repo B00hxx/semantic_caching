@@ -1,0 +1,45 @@
+services:
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: redis
+    ports:
+      - "6380:6379"
+    networks:
+      - app-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - app-network
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-app
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - redis
+      - ollama
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+    command: ["uvicorn", "API.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+volumes:
+  ollama:
+
+networks:
+  app-network:
+    driver: bridge

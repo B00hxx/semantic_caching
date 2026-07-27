@@ -1,30 +1,31 @@
 import redis.asyncio as redis
 import ollama
+import os
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class RedisSettings(BaseModel):
-    host : str = 'localhost'
-    port : int = 6379
-    db : int = 0
-    decode_responses : bool = True
+    host: str = Field(default_factory=lambda: os.getenv('REDIS_HOST', 'localhost'))
+    port: int = Field(default_factory=lambda: int(os.getenv('REDIS_PORT', 6379)))
+    db: int = 0
+    decode_responses: bool = True
 
     def get_client(self) -> redis.Redis:
         return redis.Redis(
-            host = self.host,
-            port = self.port,
-            db = self.db,
-            decode_responses = self.decode_responses
+            host=self.host,
+            port=self.port,
+            db=self.db,
+            decode_responses=self.decode_responses
         )
 
 
 class OllamaSettings(BaseModel):
-    host : str = 'http://localhost:11434'
+    host: str = Field(default_factory=lambda: os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
 
     def get_client(self) -> ollama.AsyncClient:
         return ollama.AsyncClient(
-            host = self.host
+            host=self.host
         )
 
 class Settings(BaseSettings):

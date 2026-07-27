@@ -1,33 +1,69 @@
 .
 ├── API
 │   ├── app.py
-│   ├── config.py
 │   ├── __init__.py
+│   ├── lifespan.py
+│   ├── map.txt
 │   ├── __pycache__
-│   │   └── main.cpython-314.pyc
-│   └── routes.py
+│   │   ├── app.cpython-312.pyc
+│   │   ├── app.cpython-314.pyc
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── __init__.cpython-314.pyc
+│   │   ├── lifespan.cpython-312.pyc
+│   │   ├── lifespan.cpython-314.pyc
+│   │   ├── main.cpython-314.pyc
+│   │   ├── routes.cpython-312.pyc
+│   │   ├── routes.cpython-314.pyc
+│   │   └── semantic_caching_service.cpython-314.pyc
+│   ├── routes.py
+│   └── schemas
+│       ├── __init__.py
+│       ├── __pycache__
+│       └── query_request.py
 ├── benchmark
 │   ├── datasets
 │   │   └── train.csv
+│   ├── execute_worker.py
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── execute_worker.cpython-314.pyc
+│   │   ├── __init__.cpython-314.pyc
+│   │   ├── questions.cpython-314.pyc
+│   │   └── worker.cpython-314.pyc
+│   ├── questions.py
 │   └── worker.py
 ├── config.py
+├── docker-compose.yml
+├── Dockerfile
 ├── __init__.py
 ├── main.py
 ├── map.txt
+├── ollama
+│   ├── cache
+│   │   └── model-recommendations.json
+│   ├── id_ed25519
+│   ├── id_ed25519.pub
+│   └── models
+│       ├── blobs
+│       └── manifests
 ├── __pycache__
 │   ├── cache_entry.cpython-314.pyc
+│   ├── config.cpython-312.pyc
 │   ├── config.cpython-314.pyc
 │   ├── cosine_sim.cpython-314.pyc
 │   ├── embedding.cpython-314.pyc
+│   ├── __init__.cpython-314.pyc
 │   ├── llm_service.cpython-314.pyc
 │   ├── main.cpython-314.pyc
 │   ├── redis_service.cpython-314.pyc
 │   ├── semantic_caching.cpython-314.pyc
 │   └── timing.cpython-314.pyc
+├── pytest.ini
 ├── requirements.txt
+├── results.json
+├── results.md
 ├── semantic_caching
 │   ├── cache_entry.py
-│   ├── config.py
 │   ├── embedding_services
 │   │   ├── embedding_service.py
 │   │   ├── __init__.py
@@ -40,14 +76,17 @@
 │   │   ├── ollama_service.py
 │   │   └── __pycache__
 │   ├── __pycache__
+│   │   ├── cache_entry.cpython-312.pyc
 │   │   ├── cache_entry.cpython-314.pyc
 │   │   ├── config.cpython-314.pyc
 │   │   ├── cosine_sim.cpython-314.pyc
 │   │   ├── embedding.cpython-314.pyc
+│   │   ├── __init__.cpython-312.pyc
 │   │   ├── __init__.cpython-314.pyc
 │   │   ├── llm_service.cpython-314.pyc
 │   │   ├── main.cpython-314.pyc
 │   │   ├── redis_service.cpython-314.pyc
+│   │   ├── semantic_caching.cpython-312.pyc
 │   │   ├── semantic_caching.cpython-314.pyc
 │   │   └── timing.cpython-314.pyc
 │   ├── semantic_caching.py
@@ -59,29 +98,29 @@
 │       ├── vector_search_result.py
 │       └── vector_store_services.py
 ├── start.sh
-└── testing
-    ├── fake_components
-    │   ├── cache_entry.py
-    │   ├── fake_embedding.py
-    │   ├── fake_llm.py
-    │   ├── fake_redis.py
-    │   ├── fake_semantic_caching.py
-    │   ├── __init__.py
-    │   ├── main_testing_pipeline.py
-    │   ├── __pycache__
-    │   └── testing.py
+├── testing
+│   ├── fake_components
+│   │   ├── fake_embedding.py
+│   │   ├── fake_llm.py
+│   │   ├── fake_redis
+│   │   ├── __init__.py
+│   │   └── __pycache__
+│   ├── __init__.py
+│   ├── integration_testing
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   └── test_integration.py
+│   ├── __pycache__
+│   │   └── __init__.cpython-314.pyc
+│   └── unit_tests
+│       ├── __init__.py
+│       ├── __pycache__
+│       └── test_semantic_caching.py
+└── utils
+    ├── cosine_similarity.py
     ├── __init__.py
-    ├── integration_testing
-    │   ├── __init__.py
-    │   ├── __pycache__
-    │   └── test_integration.py
-    ├── __pycache__
-    │   └── __init__.cpython-314.pyc
-    └── unit_tests
-        ├── __init__.py
-        ├── __pycache__
-        ├── test_fake_llm.py
-        ├── test_fake_redis.py
-        └── test_semantic_caching.py
+    └── __pycache__
+        ├── cosine_similarity.cpython-314.pyc
+        └── __init__.cpython-314.pyc
 
-22 directories, 63 files
+33 directories, 91 files

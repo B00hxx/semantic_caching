@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Request
-from .schemas.query_request import QueryRequest
+from API.schemas.query_request import QueryRequest
 
 
 router = APIRouter()
@@ -15,6 +15,7 @@ async def ask_question(query_request : QueryRequest, request : Request):
 async def get_stats(request : Request):
     info = await request.app.state.redis_client.info()
     return {
-        "Total keys" : request.app.state.semantic_caching_service.vector_store.get_size(),
+        "Total keys" : await request.app.state.semantic_caching_service.vector_store.get_size(),
         "Memory used (bytes)" : info['used_memory']
     }
+

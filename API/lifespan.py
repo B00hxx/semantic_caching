@@ -1,11 +1,11 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from ..config import settings
-from ..semantic_caching.semantic_caching import SemanticCaching
-from ..semantic_caching.llm_services.ollama_service import OllamaLLM
-from ..semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
-from ..semantic_caching.vector_store_services.redis_service import RedisService
+from config import settings
+from semantic_caching.semantic_caching import SemanticCaching
+from semantic_caching.llm_services.ollama_service import OllamaLLM
+from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
+from semantic_caching.vector_store_services.redis_service import RedisService
 from dotenv import load_dotenv
 
 
@@ -33,10 +33,17 @@ async def lifespan(app : FastAPI):
     
     yield
     load_dotenv()
-    feature_flag = (os.getenv("DELETE_ON_SHUTDOWN").lower() == "true")
-    if feature_flag:
-        await app.state.semantic_caching_service.vector_store.empty_database()
-        print("The database is clear!")
-    else:
-        print("keeping the database!")
-    await redis_client.aclose()
+    try:
+        feature_flag = (os.getenv("DELETE_ON_SHUTDOWN", "false").lower() == "true")
+        if feature_flag:
+            await app.state.semantic_caching_service.vector_store.empty_database()
+            print("The database is clear!")
+        else:
+            print("keeping the database!")
+    except Exception as exc:
+        print(f"Shutdown cleanup skipped: {exc}")
+    finally:
+        try:
+            await redis_client.aclose()
+        except Exception as exc:
+            print(f"Redis client close skipped: {exc}")
