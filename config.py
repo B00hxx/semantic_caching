@@ -30,7 +30,7 @@ class OllamaSettings(BaseModel):
 class Settings(BaseSettings):
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)
-
+    delete_on_shutdown: bool = True
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

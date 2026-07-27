@@ -10,5 +10,3 @@ class FakeRedisClient:
         return copy.deepcopy(self.storage.get(key, {}))
     def delete(self, key : str) -> None:
         self.storage.pop(key, None)
-
-fake_redis_client = FakeRedisClient()

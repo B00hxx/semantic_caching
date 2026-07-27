@@ -1,14 +1,14 @@
 import json
 import uuid
+from .fake_redis_client import FakeRedisClient
 from semantic_caching.cache_entry import CacheEntry
 from semantic_caching.vector_store_services.vector_store_services import VectorStore, VectorSearchResult
 from utils.cosine_similarity import cosine_similarity
-from .fake_redis_client import fake_redis_client
 from numpy import ndarray
 
 
 class FakeRedisService(VectorStore):
-    def __init__(self, client = fake_redis_client, dimension : int = 3):
+    def __init__(self, client : FakeRedisClient, dimension : int = 3):
         self.client = client
         self.dimension = dimension
         self.status = "Redis has connected successfully"
@@ -20,7 +20,7 @@ class FakeRedisService(VectorStore):
             "question" : entry.question,
             "embedding" : entry.embedding,
             "answer" : entry.answer,
-            "time" : str(entry.current_time),
+            "time" : str(entry.created_at),
             "ttl" : entry.ttl_seconds
         }
 
@@ -46,13 +46,15 @@ class FakeRedisService(VectorStore):
                 if similarity > max:
                     max = similarity
                     key_to_return = key
+        if key_to_return == "":
+            return None
         vector_search_result = VectorSearchResult(
-                        answer = self.client.storage[key_to_return].answer,
-                        question = self.client.storage[key_to_return].question,
+                        answer = self.client.storage[key_to_return]["answer"],
+                        question = self.client.storage[key_to_return]["question"],
                         score= max,
                         identifier = key_to_return,
-                        time = self.client.storage[key_to_return].time,
-                        ttl=self.ttl(key_to_return)
+                        time = self.client.storage[key_to_return]['time'],
+                        ttl= self.client.storage[key_to_return]['ttl']
                     )
         return vector_search_result
     
