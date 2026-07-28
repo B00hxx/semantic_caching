@@ -8,9 +8,14 @@ class Worker:
     def __init__(self, worker_id: int, timeout: float = 100000.0):
         self.worker_id = worker_id
         self.timeout = httpx.Timeout(timeout)
+        self._client = None
 
-    async def _send_request(
-        self, client: httpx.AsyncClient, link: str, question: str) -> Dict[str, Any]:
+    async def get_client(self) -> httpx.AsyncClient:
+        if self._client == None:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
+    async def _send_request(self, client: httpx.AsyncClient, link: str, question: str) -> Dict[str, Any]:
+        client = await self.get_client()
         start = time.perf_counter()
         try:
             response = await client.post(link, json={"query": question})

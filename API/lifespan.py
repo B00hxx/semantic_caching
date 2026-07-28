@@ -24,7 +24,7 @@ async def lifespan(app : FastAPI):
     testing_redis = RedisService(client=redis_client, dimension=1024)
     await testing_redis.initialize()
 
-    testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.8)
+    testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75)
     
     app.state.semantic_caching_service = testing
 

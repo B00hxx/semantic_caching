@@ -22,6 +22,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: fastapi-app
+    security_opt:
+      - no-new-privileges:false
     ports:
       - "8000:8000"
     environment:
@@ -43,3 +45,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  
+
