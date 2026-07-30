@@ -23,3 +23,8 @@ async def get_stats(request : Request):
 async def delete_cache(del_query : DeleteQuery, request : Request):
     if del_query.state:
         await request.app.state.semantic_caching_service.vector_store.empty_database()
+
+@router.post('/fake_ask')
+async def fake_ask_question(query_request : QueryRequest, request : Request):
+    result = await request.app.state.fake_testing.get_answers(query=query_request.query)
+    return result

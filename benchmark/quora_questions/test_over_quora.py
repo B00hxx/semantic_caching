@@ -51,14 +51,14 @@ class ParallelBenchmarking:
         # Send first question to populate cache
         _ = await worker._send_request(
             client=client,
-            link=f"{self.base_url}/ask",
+            link=f"{self.base_url}/fake_ask",
             question=pair.question1
         )
         
         # Send second question to check cache hit
         result = await worker._send_request(
             client=client,
-            link=f"{self.base_url}/ask",
+            link=f"{self.base_url}/fake_ask",
             question=pair.question2
         )
         
@@ -182,7 +182,7 @@ async def execute_sequential_worker():
     quora_questions_df = pd.read_csv('benchmark/datasets/train.csv')
     
     benchmark = ParallelBenchmarking(num_workers=1)
-    results = await benchmark.run_sequential_benchmark(quora_questions_df, limit=10)
+    results = await benchmark.run_sequential_benchmark(quora_questions_df, limit=1000)
     
     return results
 
@@ -192,8 +192,8 @@ async def execute_parallel_workers():
     quora_questions_df = pd.read_csv('benchmark/datasets/train.csv')
     
     # Use multiple workers for parallel processing
-    benchmark = ParallelBenchmarking(num_workers=4, cache_clear_duration=50)
-    results = await benchmark.run_parallel_benchmark(quora_questions_df, limit=50)
+    benchmark = ParallelBenchmarking(num_workers=8, cache_clear_duration=50)
+    results = await benchmark.run_parallel_benchmark(quora_questions_df, limit=10000)
     
     return results
 
@@ -203,10 +203,10 @@ if __name__ == "__main__":
     
     # Choose which benchmark to run:
     # For sequential (original behavior):
-    #result = asyncio.run(execute_sequential_worker())
+    result = asyncio.run(execute_sequential_worker())
     
     # For parallel processing (faster):
-    result = asyncio.run(execute_parallel_workers())
+    #result = asyncio.run(execute_parallel_workers())
     
     print("\n=== Results ===")
     for key, value in result.items():
