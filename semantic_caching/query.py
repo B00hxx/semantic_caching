@@ -1,43 +1,38 @@
-import asyncio
+import os
 import httpx
 
-class Query:
-    """This class can be used to redact the info that is sensitive"""
-    def __init__(self, query : str):
-        self.query = query
-    async def process(self)->str:
-        ANALYZER_URL = "http://localhost:5002/analyze"
-        ANONYMIZER_URL = "http://localhost:5001/anonymize"
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            analyze_payload = {
-                "text": self.query,
-                "language": "en",
-            }
-            analyze_response = await client.post(
-                ANALYZER_URL,
-                json=analyze_payload,
-                headers={"Content-Type": "application/json"},
-            )
-            analyze_results = analyze_response.json()
+class QueryProcessor:
+    """Redacts sensitive information using analyzer/anonymizer microservices."""
+    def __init__(self, analyzer_url: str = None, anonymizer_url: str = None):
+        self.analyzer_url = analyzer_url or os.getenv("ANALYZER_URL", "http://localhost:5002/analyze")
+        self.anonymizer_url = anonymizer_url or os.getenv("ANONYMIZER_URL", "http://localhost:5001/anonymize")
+
+    async def process(self, query : str) -> str:
+        async with httpx.AsyncClient() as client:
+            analyze_payload = {"text": query, "language": "en"}
+            try:
+                analyze_resp = await client.post(self.analyzer_url, json=analyze_payload)
+                analyze_resp.raise_for_status()
+                analyzer_results = analyze_resp.json()
+            except httpx.HTTPStatusError as e:
+                raise RuntimeError(f"Analyzer service error: {e.response.status_code}") from e
+            except httpx.RequestError as e:
+                raise RuntimeError(f"Analyzer connection failed: {e}") from e
+
+            if not isinstance(analyzer_results, list):
+                raise ValueError(f"Unexpected analyzer response format: {type(analyzer_results)}")
+
             anonymize_payload = {
-                        "text": self.query,
-                        "anonymizers": {
-                            "PHONE_NUMBER": {
-                                "type": "replace",
-                                "new_value": "--Redacted phone number--",
-                            }
-                        },
-                        "analyzer_results": analyze_results,  # Feeding analyzer results directly
-                    }
-            
-            anonymize_response = await client.post(
-                        ANONYMIZER_URL,
-                        json=anonymize_payload,
-                        headers={"Content-Type": "application/json"},
-                    )
-            anonymize_results = anonymize_response.json()
-        return anonymize_results['text']
+                "text": query,
+                "anonymizers": {
+                    "DEFAULT": {"type": "replace", "new_value": "<REDACTED>"}
+                },
+                "analyzer_results": analyzer_results,
+            }
 
-
-test_query = Query("my phone number is +1221523470")
-print(asyncio.run(test_query.process()))
+            try:
+                anonymize_resp = await client.post(self.anonymizer_url, json=anonymize_payload)
+                anonymize_resp.raise_for_status()
+                return anonymize_resp.json()["text"]
+            except (httpx.HTTPStatusError, httpx.RequestError, KeyError) as e:
+                raise RuntimeError(f"Anonymization failed: {e}") from e

@@ -17,6 +17,22 @@ services:
     networks:
       - app-network
 
+  presidio-analyzer:
+    image: ghcr.io/data-privacy-stack/presidio-analyzer:latest
+    container_name: presidio-analyzer
+    ports:
+      - "5002:3000"
+    networks:
+      - app-network
+
+  presidio-anonymizer:
+    image: ghcr.io/data-privacy-stack/presidio-anonymizer:latest
+    container_name: presidio-anonymizer
+    ports:
+      - "5001:3000"
+    networks:
+      - app-network
+
   fastapi:
     build:
       context: .
@@ -30,14 +46,18 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       OLLAMA_HOST: http://ollama:11434
+      ANALYZER_URL: http://presidio-analyzer:3000/analyze
+      ANONYMIZER_URL: http://presidio-anonymizer:3000/anonymize
     depends_on:
       - redis
       - ollama
+      - presidio-analyzer
+      - presidio-anonymizer
     volumes:
       - .:/app
     networks:
       - app-network
-    command: ["uvicorn", "API.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "API.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:
   ollama:
@@ -45,5 +65,3 @@ volumes:
 networks:
   app-network:
     driver: bridge
-  
-
