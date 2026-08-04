@@ -10,10 +10,20 @@ from .vector_search_result import VectorSearchResult
 
 
 class RedisService(VectorStore):
-    def __init__(self, client: redis.Redis, dimension: int):
+    def __init__(
+        self,
+        client: redis.Redis,
+        dimension: int,
+        key_prefix: str = "cache:",
+        index_name: str = "cache_index",
+    ):
         self.client = client
         self.status = "Not initialized yet!"
         self.dimension = dimension
+        # Each pipeline gets its own prefix + index so that entries written by one
+        # (e.g. a benchmark run with a stub LLM) can never be served by another.
+        self.key_prefix = key_prefix
+        self.index_name = index_name
         # Removed self.create_index() because __init__ cannot await async functions
 
     async def initialize(self) -> None:
@@ -41,12 +51,12 @@ class RedisService(VectorStore):
             ),
         )
         definition = IndexDefinition(
-            prefix=["cache:"],
+            prefix=[self.key_prefix],
             index_type=IndexType.HASH
         )
         try:
             # Awaited async index creation
-            await self.client.ft("cache_index").create_index(
+            await self.client.ft(self.index_name).create_index(
                 schema,
                 definition=definition
             )
@@ -54,7 +64,7 @@ class RedisService(VectorStore):
             print("INDEX CREATION LOG:", e)
 
     async def add_entry(self, entry: CacheEntry) -> str:
-        cache_id = f"cache:{str(uuid.uuid4())}" 
+        cache_id = f"{self.key_prefix}{str(uuid.uuid4())}"
         await self.client.hset(
             cache_id,
             mapping={
@@ -73,15 +83,16 @@ class RedisService(VectorStore):
     
     async def get_size(self) -> int:
         count = 0
-        async for _ in self.client.scan_iter(match="cache:*"):
+        async for _ in self.client.scan_iter(match=f"{self.key_prefix}*"):
             count += 1
         return count
-    
-    async def empty_database(self) -> None:
-        keys = [key async for key in self.client.scan_iter(match="cache:*")]
+
+    async def empty_database(self) -> int:
+        keys = [key async for key in self.client.scan_iter(match=f"{self.key_prefix}*")]
         if keys:
             await self.client.delete(*keys)
         print(f"Cleared {len(keys)} cache keys!")
+        return len(keys)
     
     async def search(self, query_embedding: np.ndarray, threshold: float):
         query = (
@@ -90,7 +101,7 @@ class RedisService(VectorStore):
             .return_fields("question", "answer", "score", "time")
             .dialect(2)
         )
-        results = await self.client.ft("cache_index").search(
+        results = await self.client.ft(self.index_name).search(
             query,
             query_params={
                 "vec": query_embedding.astype(np.float32).tobytes()

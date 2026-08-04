@@ -24,13 +24,23 @@ async def lifespan(app : FastAPI):
     testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
     testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
     testing_redis = RedisService(client=redis_client, dimension=1024)
+    # Benchmark traffic answered by the stub LLM lives in its own index, so its
+    # placeholder answers can never be returned to a real caller.
+    benchmark_redis = RedisService(
+        client=redis_client,
+        dimension=1024,
+        key_prefix="bench:",
+        index_name="bench_index",
+    )
     fake_llm = FakeLLMToDeploy()
     query_processor = QueryProcessor()
     await testing_redis.initialize()
+    await benchmark_redis.initialize()
 
     testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
-    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
-    
+    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=benchmark_redis, threshold=0.75, query_processor=query_processor)
+
+
     app.state.semantic_caching_service = testing
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
@@ -44,6 +54,7 @@ async def lifespan(app : FastAPI):
         feature_flag = (os.getenv("DELETE_ON_SHUTDOWN", "false").lower() == "true")
         if feature_flag:
             await app.state.semantic_caching_service.vector_store.empty_database()
+            await app.state.fake_testing.vector_store.empty_database()
             print("The database is clear!")
         else:
             print("keeping the database!")

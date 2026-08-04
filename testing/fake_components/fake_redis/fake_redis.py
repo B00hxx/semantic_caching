@@ -34,8 +34,10 @@ class FakeRedisService(VectorStore):
     async def get_size(self)->int:
         return len(self.client.storage.keys())
     
-    async def empty_database(self):
+    async def empty_database(self) -> int:
+        cleared = len(self.client.storage)
         self.client.storage.clear()
+        return cleared
 
     async  def search(self, query_embedding : ndarray, threshold : float):
         max : float = 0.0
