@@ -3,12 +3,14 @@ import httpx
 
 class QueryProcessor:
     """Redacts sensitive information using analyzer/anonymizer microservices."""
-    def __init__(self, analyzer_url: str = None, anonymizer_url: str = None):
+    def __init__(self, analyzer_url: str = None, anonymizer_url: str = None, timeout: float = 10):
         self.analyzer_url = analyzer_url or os.getenv("ANALYZER_URL", "http://localhost:5002/analyze")
         self.anonymizer_url = anonymizer_url or os.getenv("ANONYMIZER_URL", "http://localhost:5001/anonymize")
-
+        self.timeout = timeout
+        print(f"Analyzer URL: {self.analyzer_url}")
+        print(f"Anonymizer URL: {self.anonymizer_url}")
     async def process(self, query : str) -> str:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             analyze_payload = {"text": query, "language": "en"}
             try:
                 analyze_resp = await client.post(self.analyzer_url, json=analyze_payload)

@@ -1,0 +1,15 @@
+# custom_rules.yaml
+recognizers:
+  - name: "Project Code Recognizer"
+    supported_language: "en"
+    supported_entity: "CONFIDENTIAL_PROJECT"
+    deny_list:
+      - "Project Manhattan"
+      - "Confidential Project X"
+  - name: "Employee ID Recognizer"
+    supported_language: "en"
+    supported_entity: "EMPLOYEE_ID"
+    patterns:
+      - name: "emp_regex"
+        regex: "EMP-\\d{6}"
+        score: 0.95

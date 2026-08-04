@@ -18,12 +18,18 @@ services:
       - app-network
 
   presidio-analyzer:
-    image: ghcr.io/data-privacy-stack/presidio-analyzer:latest
+    build:
+      context: ./semantic_caching/presidio-analyzer
+      dockerfile: Dockerfile
     container_name: presidio-analyzer
     ports:
       - "5002:3000"
+    volumes:
+      - ./custom_recognizers:/app/custom-rules
     networks:
       - app-network
+    environment:
+      CUSTOM_RULES_DIR: /app/custom-rules
 
   presidio-anonymizer:
     image: ghcr.io/data-privacy-stack/presidio-anonymizer:latest
@@ -48,6 +54,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
       ANALYZER_URL: http://presidio-analyzer:3000/analyze
       ANONYMIZER_URL: http://presidio-anonymizer:3000/anonymize
+      CUSTOM_RULES_DIR: /app/custom-rules
     depends_on:
       - redis
       - ollama
@@ -55,12 +62,14 @@ services:
       - presidio-anonymizer
     volumes:
       - .:/app
+      - ./custom_recognizers:/app/custom-rules
     networks:
       - app-network
     command: ["uvicorn", "API.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:
   ollama:
+  presidio-rules:
 
 networks:
   app-network:

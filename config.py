@@ -28,9 +28,16 @@ class OllamaSettings(BaseModel):
             host=self.host
         )
 
+class PresidioSettings(BaseModel):
+    analyzer_url: str = Field(default_factory=lambda: os.getenv('ANALYZER_URL', 'http://localhost:5002/analyze'))
+    anonymizer_url: str = Field(default_factory=lambda: os.getenv('ANONYMIZER_URL', 'http://localhost:5001/anonymize'))
+    custom_rules_dir: str = Field(default_factory=lambda: os.getenv('CUSTOM_RULES_DIR', './custom_recognizers'))
+
+  
 class Settings(BaseSettings):
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)
+    presidio: PresidioSettings = Field(default_factory=PresidioSettings)
     delete_on_shutdown: bool = True
     model_config = SettingsConfigDict(
         env_file=".env",
