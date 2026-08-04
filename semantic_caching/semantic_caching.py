@@ -21,27 +21,42 @@ class SemanticCaching:
         self.query_processor = query_processor
 
     async def get_answers(self, query:str)->dict:
+        # Queries carrying sensitive entities are still redacted before they reach the
+        # provider, but they are never matched against nor written to the cache: every
+        # entity collapses to the same placeholder, so two different secrets produce
+        # identical text and one caller would be served the other caller's answer.
+        cacheable = True
         if self.query_processor is not None:
-            query = await self.query_processor.process(query)
-            print(query)
-        embedded = await self.embedding.embed(query)
-        response_from_vector_store = await self.vector_store.search(query_embedding=embedded, threshold=self.threshold)
-        if response_from_vector_store == None:
-            answer_by_llm = await self.llm.generate(query=query)
-            entry = CacheEntry(query, embedded, answer_by_llm)
+            redaction = await self.query_processor.process(query)
+            query = redaction.text
+            cacheable = not redaction.has_pii
+            if not cacheable:
+                logger.info("Sensitive entities detected; bypassing cache for this query")
+
+        if cacheable:
+            embedded = await self.embedding.embed(query)
+            response_from_vector_store = await self.vector_store.search(query_embedding=embedded, threshold=self.threshold)
+            if response_from_vector_store is not None:
+                return {
+                    "cache_hit" : True,
+                    "cache_bypassed" : False,
+                    "cosine_distance" : response_from_vector_store.score,
+                    "answer" : response_from_vector_store.answer,
+                    "time" : response_from_vector_store.time,
+                    "id" : response_from_vector_store.identifier,
+                    "ttl" : response_from_vector_store.ttl
+                }
+
+        answer_by_llm = await self.llm.generate(query=query)
+        entry = CacheEntry(query, embedded if cacheable else None, answer_by_llm)
+        if cacheable:
             await self.vector_store.add_entry(entry)
-            return {
-                "cache_hit" : False,
-                "cosine_distance" : None,
-                "answer" : answer_by_llm,
-                "time" : entry.created_at            
-            }
-        else:
-            return {
-                "cache_hit" : True,
-                "cosine_distance" : response_from_vector_store.score,
-                "answer" : response_from_vector_store.answer,
-                "time" : response_from_vector_store.time,
-                "id" : response_from_vector_store.identifier,
-                "ttl" : response_from_vector_store.ttl
-            }
+        return {
+            "cache_hit" : False,
+            "cache_bypassed" : not cacheable,
+            "cosine_distance" : None,
+            "answer" : answer_by_llm,
+            "time" : entry.created_at,
+            "id" : None,
+            "ttl" : None
+        }
