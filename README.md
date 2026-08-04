@@ -4,6 +4,11 @@ A high-performance, privacy-focused **Semantic Caching & Data Anonymization Midd
 
 This repository provides an end-to-end asynchronous pipeline that combines **Vector Similarity Search (Redis HNSW)**, **Privacy Protection / PII Redaction (Microsoft Presidio)**, **Local LLM & Embedding Services (Ollama)**, and a **Benchmarking & Testing Framework**.
 
+> **New to the project?** Start with [`docs/INTERN_GUIDE.md`](docs/INTERN_GUIDE.md) —
+> what we are building and why, the vocabulary, a module-by-module tour, and the
+> deliverables roadmap. Then read [`docs/CODE_REVIEW.md`](docs/CODE_REVIEW.md) for the
+> current, prioritized list of known bugs and gaps.
+
 ---
 
 ## 📋 Table of Contents
@@ -181,7 +186,7 @@ The services will be available at:
 
 ## 🛠️ Configuration & Environment Variables
 
-System configuration is defined in [`config.py`](file:///home/baha/Documents/internship/config.py) and can be overridden via environment variables or a `.env` file:
+System configuration is defined in [`config.py`](config.py) and can be overridden via environment variables or a `.env` file:
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
