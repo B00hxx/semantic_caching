@@ -1,4 +1,5 @@
 import asyncio
+import os
 import httpx
 import pandas as pd
 from tqdm import tqdm
@@ -6,8 +7,15 @@ from benchmark.quora_questions.question_pair import QuoraQuestionsPair
 from benchmark.worker import Worker
 
 payload = {
-    "state": "true"  
+    "state": "true"
 }
+
+# The flush endpoint is guarded when the server runs with a token. A silently
+# rejected flush leaves stale entries behind and corrupts the confusion matrix,
+# so send the token and treat a rejection as fatal.
+ADMIN_HEADERS = (
+    {"X-Admin-Token": os.environ["ADMIN_TOKEN"]} if os.getenv("ADMIN_TOKEN") else {}
+)
 
 class ParallelBenchmarking:
     def __init__(self, num_workers: int = 5, cache_clear_duration: int = 100, base_url: str = "http://127.0.0.1:8000"):
@@ -26,13 +34,12 @@ class ParallelBenchmarking:
     
     async def clear_cache(self, client: httpx.AsyncClient):
         """Clear the server cache"""
-        try:
-            await client.post(
-                f"{self.base_url}/delte_cache", 
-                json=payload
-            )
-        except Exception as e:
-            print(f"Warning: Failed to clear cache: {e}")
+        response = await client.post(
+            f"{self.base_url}/delte_cache",
+            json=payload,
+            headers=ADMIN_HEADERS,
+        )
+        response.raise_for_status()
     
     async def update_metrics(self, cache_hit: bool, is_duplicate: int):
         """Thread-safe metrics update"""

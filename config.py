@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)
     presidio: PresidioSettings = Field(default_factory=PresidioSettings)
     delete_on_shutdown: bool = True
+    # Shared secret guarding the endpoints that flush the cache or write rule files.
+    # Unset means "local development": the endpoints stay open and log a warning.
+    admin_token: str | None = Field(default_factory=lambda: os.getenv('ADMIN_TOKEN'))
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
