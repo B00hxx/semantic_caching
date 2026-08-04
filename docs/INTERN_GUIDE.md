@@ -155,7 +155,13 @@ The five deliverables from the project brief, honestly scored:
 | **Production integration recipe** | 🔴 missing | Current Docker setup is dev-only (`--reload`, whole repo bind-mounted, root user). No auth, no metrics endpoint, no single-flight, no graceful degradation when Redis is down. |
 
 Read `docs/CODE_REVIEW.md` for the concrete bug list behind that table, ordered by
-severity, with file and line references. Work top-down through it.
+severity, with file and line references. The blockers (wrong answers, container
+escape) are already fixed on this branch and listed at the top of that file; work
+top-down through what is left.
+
+One consequence to keep in mind while benchmarking: the fake-LLM pipeline
+(`/fake_ask`) now writes to its own index (`bench:` / `bench_index`), so benchmark
+traffic no longer pollutes `/ask`. `/stats` still reports only the main index.
 
 ---
 
@@ -180,10 +186,12 @@ measurable — a number or a plot, not "it works on my machine".
 5. **Invalidation.** Implement and compare: fixed TTL, sliding TTL on hit, LRU with a
    max-entry cap, and explicit model-version namespacing. Metric: hit rate vs
    staleness vs memory.
-6. **Safety.** Decide (and defend) what happens to a query containing PII:
-   redact-and-cache, or **bypass the cache entirely**. See finding #1 in the review —
-   the current redact-and-cache path can leak one user's answer to another user.
-   Add tests with fake analyzer responses.
+6. **Safety.** The cache-bypass-on-PII behaviour is already in place (review finding
+   #1: redact-and-cache leaked one caller's answer to another). Your job is to measure
+   its cost — what fraction of real traffic gets bypassed, and what that does to the
+   hit rate — and to handle the failure modes: analyzer down (fail closed: bypass, do
+   not cache), per-entity-type policy, and whether a redacted query should reach the
+   provider at all.
 7. **Hardening.** Single-flight/request coalescing to kill the cache stampede,
    graceful degradation when Redis or the analyzer is down, auth on destructive
    endpoints, non-root container, healthchecks, `/metrics`.

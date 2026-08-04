@@ -197,6 +197,7 @@ System configuration is defined in [`config.py`](config.py) and can be overridde
 | `ANONYMIZER_URL` | `http://localhost:5001/anonymize` | Presidio Anonymizer endpoint |
 | `CUSTOM_RULES_DIR` | `./custom_recognizers` | Directory containing custom Presidio YAML rules |
 | `DELETE_ON_SHUTDOWN` | `false` | If `true`, flushes the Redis vector cache on app shutdown |
+| `ADMIN_TOKEN` | _unset_ | Shared secret required in the `X-Admin-Token` header by `/delte_cache` and `/upload-redaction-rules/`. Unset leaves those endpoints open (local development only) and logs a warning at each call. Set it for any shared or exposed deployment — and export it before running the Quora benchmark, which flushes the cache. |
 
 ---
 
@@ -214,11 +215,17 @@ System configuration is defined in [`config.py`](config.py) and can be overridde
   ```json
   {
     "cache_hit": false,
+    "cache_bypassed": false,
     "cosine_distance": null,
     "answer": "Machine learning is a subset of artificial intelligence...",
-    "time": "2026-08-04T12:00:00.000000"
+    "time": "2026-08-04T12:00:00.000000",
+    "id": null,
+    "ttl": null
   }
   ```
+- `cache_bypassed: true` means the query contained sensitive entities: it was redacted
+  before reaching the provider, but it was neither matched against nor written to the
+  cache. See `docs/CODE_REVIEW.md` finding #1 for why.
 
 ### 2. Fast/Fake Ask (Benchmarking Mock LLM)
 - **URL**: `POST /fake_ask`

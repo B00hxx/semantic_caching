@@ -13,11 +13,24 @@ methodology, and failure handling — not in the core idea.
 Findings are ordered by severity. Each has a location, why it is wrong, and the fix.
 Severity: 🔴 blocker / 🟠 major / 🟡 minor / 🔵 improvement.
 
+**Already fixed on this branch** (the ones that serve wrong answers or write outside
+the container — everything else is open work):
+
+| # | Finding | What changed |
+|---|---|---|
+| 1 | Redaction collision leaked answers across callers | Queries with detected entities are still redacted for the provider, but bypass the cache entirely (no lookup, no store). New `cache_bypassed` field; 3 unit tests. |
+| 2 | `/ask` and `/fake_ask` shared one index | `RedisService` takes `key_prefix` / `index_name`; the stub-LLM pipeline now uses `bench:` / `bench_index`. |
+| 9 | Path traversal in rules upload | Basename-only, charset whitelist, resolved-path containment check, 256 KB body cap, admin guard. |
+| 10 | Unauthenticated cache flush | `X-Admin-Token` guard (`ADMIN_TOKEN`) on flush + upload; flush returns the number of keys deleted. |
+| 12 | Upload claimed rules were live | Response now states `active: false` and that the analyzer must restart. (A `/reload` endpoint is still the real fix.) |
+| 23 | Anonymizer called even with nothing to redact | Early return when the analyzer finds no entities — one round-trip saved on every clean query. |
+| 28 | PII path had no unit tests | `FakeQueryProcessor` added; bypass behaviour covered. (Analyzer-down behaviour still untested.) |
+
 ---
 
 ## Correctness & privacy
 
-### 🔴 1. Redaction makes distinct queries collide → one user gets another user's answer
+### 🔴 1. Redaction makes distinct queries collide → one user gets another user's answer — ✅ fixed on this branch
 
 `semantic_caching/semantic_caching.py:24-32`, `semantic_caching/query.py:27-38`
 
@@ -45,7 +58,7 @@ Fix: `QueryProcessor.process()` returns `(text, spans)`. `SemanticCaching.get_an
 skips both `search()` and `add_entry()` when `spans` is non-empty, and returns
 `{"cache_hit": false, "cache_bypassed": true, ...}`.
 
-### 🔴 2. `/ask` and `/fake_ask` share one cache namespace → `"x"` served to real users
+### 🔴 2. `/ask` and `/fake_ask` share one cache namespace → `"x"` served to real users — ✅ fixed on this branch
 
 `API/lifespan.py:26-36`
 
@@ -142,7 +155,7 @@ of raising. Guard the denominator and raise on degenerate input.
 
 ## Security
 
-### 🔴 9. Path traversal in the rules-upload endpoint
+### 🔴 9. Path traversal in the rules-upload endpoint — ✅ fixed on this branch
 
 `API/routes.py:37-54`
 
@@ -162,15 +175,21 @@ Fix: `name = os.path.basename(file.filename)`, reject anything that is not
 (`Path(p).resolve().is_relative_to(Path(rules_dir).resolve())`), cap the body size,
 and put the endpoint behind auth.
 
-### 🟠 10. Destructive endpoint, unauthenticated, and misspelled
+### 🟠 10. Destructive endpoint, unauthenticated, and misspelled — ✅ partly fixed on this branch
 
 `API/routes.py:26-29`
 
 `POST /delte_cache` flushes the whole cache for anyone who can reach the port,
 returns `null` (no status), and the path is a typo that is now baked into
-`benchmark/quora_questions/test_over_quora.py:31`. Rename to `/cache` with
-`DELETE`, require an API key or admin token, return the number of keys deleted, and
-update the benchmark.
+`benchmark/quora_questions/test_over_quora.py:31`.
+
+Fixed here: admin-token guard, and it now returns `{"deleted": n}`. Still open: the
+route name. Rename it to `DELETE /cache` and update the benchmark caller in the same
+commit — the typo is load-bearing right now.
+
+Note for whoever runs benchmarks: once `ADMIN_TOKEN` is set, the Quora harness must
+send `X-Admin-Token` or every `clear_cache()` silently 401s (it swallows the error at
+`test_over_quora.py:34`) and the confusion matrix goes to garbage.
 
 ### 🟡 11. Container hardening reversed on purpose
 
@@ -182,7 +201,7 @@ the entire repo over `/app`, and ships `uvicorn --reload` as its `CMD`, so the
 "production" image is a dev image. Fix: non-root `USER`, no `--reload` in the image
 (override it in compose for dev only), copy only what is needed.
 
-### 🟡 12. Uploaded rules never take effect
+### 🟡 12. Uploaded rules never take effect — ✅ documented in the response, reload still missing
 
 `semantic_caching/presidio-analyzer/server.py:204`
 
@@ -342,7 +361,7 @@ model turns into piled-up requests. Middleware in front of an LLM must degrade
 predictably: bounded timeout, one retry on connection errors, and a clear 503 when the
 provider is down.
 
-### 🟡 23. PII redaction adds two serial HTTP round-trips to every request — including hits
+### 🟡 23. PII redaction adds two serial HTTP round-trips to every request — including hits — ✅ partly fixed (early return added; shared client still missing)
 
 `semantic_caching/query.py:12-38`
 
@@ -405,7 +424,7 @@ because someone ran the app first. Call `initialize()` in a fixture, and use a
 test-only index prefix so the suite cannot wipe or read real cache data
 (`empty_database()` at lines 65/97 currently flushes whatever is there).
 
-### 🟠 28. The PII path has no unit tests at all
+### 🟠 28. The PII path has no unit tests at all — ✅ partly fixed (bypass covered; failure modes not)
 
 `semantic_caching/query.py`, `testing/fake_components/`
 
