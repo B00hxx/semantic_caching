@@ -10,10 +10,11 @@ from .vector_search_result import VectorSearchResult
 
 
 class RedisService(VectorStore):
-    def __init__(self, client: redis.Redis, dimension: int):
+    def __init__(self, client: redis.Redis, dimension: int, prefix : str):
         self.client = client
         self.status = "Not initialized yet!"
         self.dimension = dimension
+        self.prefix = prefix
         # Removed self.create_index() because __init__ cannot await async functions
 
     async def initialize(self) -> None:
@@ -41,7 +42,7 @@ class RedisService(VectorStore):
             ),
         )
         definition = IndexDefinition(
-            prefix=["cache:"],
+            prefix=[f"{self.prefix}:"],
             index_type=IndexType.HASH
         )
         try:
