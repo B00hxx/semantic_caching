@@ -23,13 +23,16 @@ async def lifespan(app : FastAPI):
 
     testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
     testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
-    testing_redis = RedisService(client=redis_client, dimension=1024)
+    testing_redis = RedisService(client=redis_client, dimension=1024, prefix="cache")
+    testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache")
     fake_llm = FakeLLMToDeploy()
     query_processor = QueryProcessor()
+    
     await testing_redis.initialize()
+    await testing_fake_redis.initialize()
 
     testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
-    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
+    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_fake_redis, threshold=0.75, query_processor=query_processor)
     
     app.state.semantic_caching_service = testing
     app.state.redis_client = redis_client
