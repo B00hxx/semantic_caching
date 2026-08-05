@@ -5,11 +5,11 @@ from pathlib import Path
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from config import settings
 
-upload_router = APIRouter(prefix='/rules', tags=["rules"])
+router = APIRouter(prefix='/rules', tags=["rules"])
 
 MAX_FILE_SIZE = 1 * 1024 * 1024
 
-@upload_router.post("/upload-redaction-rules")
+@router.post("/upload-redaction-rules")
 async def upload_redaction_rules(file: UploadFile = File(...)):
     name = os.path.basename(file.filename)
 
