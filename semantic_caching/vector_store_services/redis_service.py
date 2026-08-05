@@ -1,7 +1,7 @@
 import uuid
 import numpy as np
 import redis.asyncio as redis
-from redis.commands.search.field import VectorField
+from redis.commands.search.field import VectorField, TagField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from ..cache_entry import CacheEntry
@@ -10,11 +10,14 @@ from .vector_search_result import VectorSearchResult
 
 
 class RedisService(VectorStore):
-    def __init__(self, client: redis.Redis, dimension: int, prefix : str):
+    def __init__(self, client: redis.Redis, dimension: int, prefix : str, namespace: str = "default"):
         self.client = client
         self.status = "Not initialized yet!"
         self.dimension = dimension
         self.prefix = prefix
+        if not namespace:
+            raise ValueError("namespace cannot be empty")
+        self.namespace = namespace
         # Removed self.create_index() because __init__ cannot await async functions
 
     async def initialize(self) -> None:
@@ -29,6 +32,7 @@ class RedisService(VectorStore):
 
     async def create_index(self):
         schema = (
+            TagField("namespace"),
             VectorField(
                 "embedding",
                 "HNSW",
@@ -63,7 +67,8 @@ class RedisService(VectorStore):
                 "embedding": entry.embedding.astype(np.float32).tobytes(),
                 "answer": entry.answer,
                 "time": str(entry.created_at),
-                "ttl": entry.ttl_seconds
+                "ttl": entry.ttl_seconds,
+                "namespace" : self.namespace
             }
         )
         await self.client.expire(cache_id, entry.ttl_seconds)
@@ -86,7 +91,9 @@ class RedisService(VectorStore):
     
     async def search(self, query_embedding: np.ndarray, threshold: float):
         query = (
-            Query("*=>[KNN 1 @embedding $vec AS score]")
+            Query(
+                "(@namespace:{$ns})=>[KNN 1 @embedding $vec AS score]"
+            )
             .sort_by("score")
             .return_fields("question", "answer", "score", "time")
             .dialect(2)
@@ -94,7 +101,8 @@ class RedisService(VectorStore):
         results = await self.client.ft(f"{self.prefix}_index").search(
             query,
             query_params={
-                "vec": query_embedding.astype(np.float32).tobytes()
+                "vec": query_embedding.astype(np.float32).tobytes(),
+                "ns": self.namespace,
             }
         )
         if not results.docs:
@@ -107,10 +115,11 @@ class RedisService(VectorStore):
             vector_search_result = VectorSearchResult(
                 answer=result.answer,
                 question=result.question,
-                score=1 - score,
-                identifier=result.id,
-                time=result.time,
-                ttl=await self.ttl(result.id)
+                score= 1 - score,
+                identifier = result.id,
+                time = result.time,
+                ttl = await self.ttl(result.id),
+                namespace=self.namespace
             )
             return vector_search_result
         return None

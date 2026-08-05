@@ -23,8 +23,8 @@ async def lifespan(app : FastAPI):
 
     testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
     testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
-    testing_redis = RedisService(client=redis_client, dimension=1024, prefix="cache")
-    testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache")
+    testing_redis = RedisService(client=redis_client, dimension=1024, prefix="cache", namespace="production")
+    testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache", namespace="testing")
     fake_llm = FakeLLMToDeploy()
     query_processor = QueryProcessor()
     
