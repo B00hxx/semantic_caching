@@ -44,5 +44,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_nested_delimiter='__'
     )
+    jwt_secret_key: str
+    admin_username: str
+    admin_password_hash: str
 
 settings = Settings()
