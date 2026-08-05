@@ -47,7 +47,7 @@ class RedisService(VectorStore):
         )
         try:
             # Awaited async index creation
-            await self.client.ft("cache_index").create_index(
+            await self.client.ft(f"{self.prefix}_index").create_index(
                 schema,
                 definition=definition
             )
@@ -55,7 +55,7 @@ class RedisService(VectorStore):
             print("INDEX CREATION LOG:", e)
 
     async def add_entry(self, entry: CacheEntry) -> str:
-        cache_id = f"cache:{str(uuid.uuid4())}" 
+        cache_id = f"{self.prefix}:{str(uuid.uuid4())}" 
         await self.client.hset(
             cache_id,
             mapping={
@@ -74,12 +74,12 @@ class RedisService(VectorStore):
     
     async def get_size(self) -> int:
         count = 0
-        async for _ in self.client.scan_iter(match="cache:*"):
+        async for _ in self.client.scan_iter(match=f"{self.prefix}:*"):
             count += 1
         return count
     
     async def empty_database(self) -> None:
-        keys = [key async for key in self.client.scan_iter(match="cache:*")]
+        keys = [key async for key in self.client.scan_iter(match=f"{self.prefix}:*")]
         if keys:
             await self.client.delete(*keys)
         print(f"Cleared {len(keys)} cache keys!")
@@ -91,7 +91,7 @@ class RedisService(VectorStore):
             .return_fields("question", "answer", "score", "time")
             .dialect(2)
         )
-        results = await self.client.ft("cache_index").search(
+        results = await self.client.ft(f"{self.prefix}_index").search(
             query,
             query_params={
                 "vec": query_embedding.astype(np.float32).tobytes()
