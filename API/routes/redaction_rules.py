@@ -4,7 +4,7 @@ import yaml
 from pathlib import Path
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from config import settings
-
+from semantic_caching.presidio_analyzer.prisidio_reload_service import reload_presidio_analyzer
 router = APIRouter(prefix='/rules', tags=["rules"])
 
 MAX_FILE_SIZE = 1 * 1024 * 1024
@@ -62,6 +62,14 @@ async def upload_redaction_rules(file: UploadFile = File(...)):
 
     with open(file_path, "wb") as f:
         f.write(content)
+    try:
+        await reload_presidio_analyzer()
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Rules uploaded but analyzer reload failed: {e}",
+    )
 
     return {
         "status": "uploaded",

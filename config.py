@@ -32,7 +32,7 @@ class PresidioSettings(BaseModel):
     analyzer_url: str = Field(default_factory=lambda: os.getenv('ANALYZER_URL', 'http://localhost:5002/analyze'))
     anonymizer_url: str = Field(default_factory=lambda: os.getenv('ANONYMIZER_URL', 'http://localhost:5001/anonymize'))
     custom_rules_dir: str = Field(default_factory=lambda: os.getenv('CUSTOM_RULES_DIR', './custom_recognizers'))
-
+    url_analyzer: str = "http://presidio-analyzer:3000"
   
 class Settings(BaseSettings):
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
