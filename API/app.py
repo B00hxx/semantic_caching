@@ -1,7 +1,15 @@
 from fastapi import FastAPI
-from .routes import router
 from .lifespan import lifespan
+from .routes.chat import router as chat_router
+from .routes.redaction_rules import router as upload_router
+from .routes.stats import router as stats_router
+from .routes.delete import router as delete_router
+from .routes.auth import router as auth_router
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(router)
+app.include_router(chat_router)
+app.include_router(upload_router)
+app.include_router(stats_router)
+app.include_router(delete_router)
+app.include_router(auth_router)

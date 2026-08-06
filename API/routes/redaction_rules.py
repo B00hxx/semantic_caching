@@ -1,44 +1,15 @@
 import os
 import re
-import httpx
 import yaml
 from pathlib import Path
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Depends
-from API.schemas.query_request import QueryRequest, DeleteQuery
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException
 from config import settings
 
+router = APIRouter(prefix='/rules', tags=["rules"])
 
-router = APIRouter()
-
-CUSTOM_RECOGNIZERS_DIR = "/app/custom-rules"
-ANALYZER_URL = os.getenv("ANALYZER_URL", "http://presidio-analyzer:5001/analyze")
 MAX_FILE_SIZE = 1 * 1024 * 1024
 
-@router.post('/ask')
-async def ask_question(query_request : QueryRequest, request : Request):
-    result = await request.app.state.semantic_caching_service.get_answers(query=query_request.query)
-    return result
-
-@router.get('/stats')
-async def get_stats(request : Request):
-    info = await request.app.state.redis_client.info()
-    return {
-        "Total keys" : await request.app.state.semantic_caching_service.vector_store.get_size(),
-        "Memory used (bytes)" : info['used_memory']
-    }
-
-@router.post('/delte_cache')
-async def delete_cache(del_query : DeleteQuery, request : Request):
-    if del_query.state:
-        await request.app.state.semantic_caching_service.vector_store.empty_database()
-
-@router.post('/fake_ask')
-async def fake_ask_question(query_request : QueryRequest, request : Request):
-    result = await request.app.state.fake_testing.get_answers(query=query_request.query)
-    return result
-
-
-@router.post("/upload-redaction-rules/")
+@router.post("/upload-redaction-rules")
 async def upload_redaction_rules(file: UploadFile = File(...)):
     name = os.path.basename(file.filename)
 
