@@ -5,10 +5,11 @@ from typing import Any, Dict, List
 
 
 class Worker:
-    def __init__(self, worker_id : int, timeout : float = 100, ):
+    def __init__(self, worker_id : int, link : str,timeout : float = 100):
         self.worker_id = worker_id
         self.timeout = httpx.Timeout(timeout)
-        self._client = httpx.AsyncClient(timeout = self.timeout)    
+        self._client = httpx.AsyncClient(timeout = self.timeout)
+        self.link = link 
    
     async def close(self) -> None:
         """Closes the worker's HTTP client if it exists."""
@@ -16,12 +17,12 @@ class Worker:
             await self._client.aclose()
             self._client = None
     
-    async def ask(self, link: str, question: str) -> Dict[str, Any]:
+    async def ask(self, question: str) -> Dict[str, Any]:
         if self._client is None:
             raise RuntimeError("Worker has been closed.")
         start = time.perf_counter()
         try:
-            response = await self._client.post(link, json={"query": question})
+            response = await self._client.post(self.link, json={"query": question})
             latency = time.perf_counter() - start
             if response.status_code == 200:
                 data = response.json()
@@ -54,3 +55,8 @@ class Worker:
                     "cache_hit": False,
                     "error": str(e),
             }
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
