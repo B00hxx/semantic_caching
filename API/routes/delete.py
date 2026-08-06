@@ -11,3 +11,10 @@ async def delete_cache(request: Request,current_user: User = Depends(get_current
     return {
         "message": "Cache deleted successfully."
     }
+
+@router.delete("/fake_cache")
+async def delete_cache(request: Request,current_user: User = Depends(get_current_admin)):
+    await request.app.state.fake_testing.vector_store.empty_database()
+    return {
+        "message": "Fake Cache deleted successfully."
+    }

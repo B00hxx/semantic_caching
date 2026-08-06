@@ -47,5 +47,6 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     admin_username: str
     admin_password_hash: str
+    admin_password : str
 
 settings = Settings()

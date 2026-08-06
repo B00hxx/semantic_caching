@@ -83,12 +83,15 @@ class RedisService(VectorStore):
             count += 1
         return count
     
-    async def empty_database(self) -> None:
-        keys = [key async for key in self.client.scan_iter(match=f"{self.prefix}:*")]
+    async def empty_database(self) -> int:
+        keys = [
+            key async for key in self.client.scan_iter(
+                match=f"{self.prefix}:*"
+            )   
+        ]
         if keys:
             await self.client.delete(*keys)
-        print(f"Cleared {len(keys)} cache keys!")
-    
+        return len(keys)
     async def search(self, query_embedding: np.ndarray, threshold: float):
         query = (
             Query(
