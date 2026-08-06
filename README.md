@@ -2,7 +2,7 @@
 
 A high-performance, privacy-focused **Semantic Caching & Data Anonymization Middleware** designed for Large Language Model (LLM) applications.
 
-This repository provides an end-to-end asynchronous pipeline that combines **Vector Similarity Search (Redis HNSW)**, **Privacy Protection / PII Redaction (Microsoft Presidio)**, **Local LLM & Embedding Services (Ollama)**, and a **Benchmarking & Testing Framework**.
+This repository provides an end-to-end asynchronous pipeline that combines **Vector Similarity Search (Redis HNSW)**, **Privacy Protection / PII Redaction (Microsoft Presidio)**, **Local LLM & Embedding Services (Ollama)**, **JWT Authentication & Access Control**, and a **Classification & Performance Benchmarking Framework**.
 
 ---
 
@@ -28,10 +28,11 @@ This repository provides an end-to-end asynchronous pipeline that combines **Vec
 Querying LLMs directly for recurring or semantically similar prompts introduces unnecessary latency, high compute overhead, and privacy risks when user prompts contain Sensitive / Personally Identifiable Information (PII).
 
 This middleware solves these problems by:
-1. **Redacting Sensitive PII Data** before queries reach the LLM or cache storage using Presidio Analyzer/Anonymizer microservices.
+1. **Redacting Sensitive PII Data** before queries reach the LLM or cache storage using Presidio Analyzer/Anonymizer microservices with runtime rule reloading.
 2. **Embedding & Searching Queries** against a Redis Vector Store using cosine distance calculation (HNSW index).
 3. **Serving Instant Cache Hits** when semantically similar queries are detected above a configurable similarity threshold.
 4. **Delegating Cache Misses** to an LLM provider (e.g., Ollama), then caching the resulting response for future matching.
+5. **Securing Administrative Actions** via OAuth2 JWT Bearer authentication.
 
 ---
 
@@ -45,12 +46,14 @@ This middleware solves these problems by:
                                     ▼
                        ┌─────────────────────────┐
                        │   FastAPI Web Server    │
+                       │   (JWT Auth & Routers)  │
                        └────────────┬────────────┘
                                     │
                                     ▼
                        ┌─────────────────────────┐
                        │     QueryProcessor      │
-                       │ (Presidio PII Redact)   │
+                       │ (Presidio PII Redact &  │
+                       │ Dynamic Rule Reloading) │
                        └────────────┬────────────┘
                                     │
                                     ▼
@@ -81,10 +84,11 @@ This middleware solves these problems by:
 
 - **🚀 Async Semantic Caching**: Powered by Redis Stack with HNSW vector index (`FLOAT32`, Cosine distance metric).
 - **🔒 Automated PII Redaction**: Integrates Presidio Analyzer and Anonymizer to replace sensitive entities with `<REDACTED>`.
-- **🧩 Custom Rule Engine**: Dynamically loads custom YAML-defined regex and pattern recognizers at runtime.
+- **🔄 Dynamic Presidio Rule Reloading**: Dynamically uploads custom YAML rules and hot-reloads the Presidio Analyzer service in real time without restarting containers.
+- **🔐 JWT Authentication & Security**: Secures administrative API endpoints (such as cache deletion) using OAuth2 JWT Bearer tokens.
 - **🦙 Ollama Integration**: Out-of-the-box support for asynchronous local LLM inference (`qwen2.5:0.5b`) and vector embeddings (`qwen3-embedding:0.6b`).
-- **📊 Cache Analytics & Management**: Endpoints for inspecting cache memory usage, key counts, and flushing the database.
-- **⚡ Concurrent Benchmark Suite**: Built-in multi-worker load tester to measure throughput (RPS), hit rates, and hit/miss latencies.
+- **📊 Cache Analytics & Management**: Endpoints for inspecting cache memory usage, key counts, and clearing the database.
+- **⚡ Classification Benchmarking Suite**: Evaluates cache duplicate detection performance on datasets (e.g., Quora Question Pairs) and outputs classification metrics including Confusion Matrix (TP, FP, TN, FN), Accuracy, Precision, Recall, and F1 Score.
 - **🧪 Comprehensive Test Coverage**: Unit tests with mock components (`FakeLLM`, `FakeEmbedder`, `FakeRedisService`) and real integration tests.
 
 ---
@@ -94,15 +98,26 @@ This middleware solves these problems by:
 ```
 .
 ├── API/                          # FastAPI web application layer
-│   ├── app.py                    # Main FastAPI app initialization
+│   ├── app.py                    # Main FastAPI app initialization & router composition
 │   ├── lifespan.py               # Async startup/shutdown initialization & cleanup
-│   ├── routes.py                 # Endpoint route handlers (/ask, /stats, /upload-redaction-rules, etc.)
+│   ├── auth/                     # JWT authentication & security utilities
+│   │   └── security.py           # Password hashing, JWT token generation & verification
+│   ├── routes/                   # Modular APIRouters
+│   │   ├── auth.py               # Authentication endpoint (/auth/login)
+│   │   ├── chat.py               # Query processing endpoints (/chat/ask, /chat/fake_ask)
+│   │   ├── delete.py             # Protected cache deletion routes (/delete/cache, /delete/fake_cache)
+│   │   ├── redaction_rules.py    # Dynamic Presidio rules upload (/rules/upload-redaction-rules)
+│   │   └── stats.py              # Cache statistics route (/stats/stats)
 │   └── schemas/                  # Pydantic request/response validation models
-│       └── query_request.py      # QueryRequest and DeleteQuery schemas
-├── benchmark/                    # Load testing and performance benchmarking
-│   ├── execute_worker.py         # Multi-worker benchmark runner script
-│   ├── worker.py                 # Async HTTP worker client
-│   └── questions.py              # Categorized prompt dataset for hit/miss benchmarking
+│       └── query_request.py      # QueryRequest schema
+├── benchmark/                    # Load testing and performance benchmarking framework
+│   ├── main.py                   # Main benchmark entrypoint script
+│   ├── clients/                  # API clients (AuthClient, CacheClient)
+│   ├── datasets/                 # Benchmarking datasets (train.csv)
+│   ├── metrics/                  # Classification metrics (ClassificationMetrics)
+│   ├── quora_questions/          # Dataloader & schemas for Quora Question Pairs
+│   ├── runners/                  # Benchmark execution runners (SequentialBenchmarkRunner)
+│   └── workers/                  # Worker execution engine (Worker)
 ├── custom_recognizers/           # Custom Presidio YAML recognizer rules directory
 │   └── gemini-code-1785749213179.yaml
 ├── semantic_caching/             # Core semantic caching & privacy modules
@@ -112,8 +127,9 @@ This middleware solves these problems by:
 │   ├── timing.py                 # Execution time measurement utilities
 │   ├── embedding_services/       # Abstract and concrete embedder classes (Ollama)
 │   ├── llm_services/             # Abstract and concrete LLM classes (Ollama, FakeLLM)
-│   ├── presidio-analyzer/       # Custom Presidio Analyzer FastAPI microservice container
+│   ├── presidio-analyzer/        # Custom Presidio Analyzer microservice container
 │   │   ├── Dockerfile
+│   │   ├── prisidio_reload_service.py # Dynamic rule reload client service
 │   │   └── server.py             # Presidio analyzer API with dynamic YAML rule loader
 │   └── vector_store_services/    # Abstract and concrete vector store classes (Redis)
 ├── testing/                      # Test suite
@@ -191,14 +207,31 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
 | `ANALYZER_URL` | `http://localhost:5002/analyze` | Presidio Analyzer endpoint |
 | `ANONYMIZER_URL` | `http://localhost:5001/anonymize` | Presidio Anonymizer endpoint |
 | `CUSTOM_RULES_DIR` | `./custom_recognizers` | Directory containing custom Presidio YAML rules |
-| `DELETE_ON_SHUTDOWN` | `false` | If `true`, flushes the Redis vector cache on app shutdown |
+| `DELETE_ON_SHUTDOWN` | `true` | If `true`, flushes the Redis vector cache on app shutdown |
+| `JWT_SECRET_KEY` | *(Required)* | Secret key used for signing JWT access tokens |
+| `ADMIN_USERNAME` | *(Required)* | Administrative username for API authentication |
+| `ADMIN_PASSWORD_HASH` | *(Required)* | Hashed password for admin authentication |
+| `ADMIN_PASSWORD` | *(Required)* | Admin password used during login authentication |
 
 ---
 
 ## 📡 API Endpoints
 
-### 1. Ask Question (Main Pipeline)
-- **URL**: `POST /ask`
+### 1. Authentication (Login)
+- **URL**: `POST /auth/login`
+- **Body** (Form-Data):
+  - `username`: Admin username
+  - `password`: Admin password
+- **Response**:
+  ```json
+  {
+    "access_token": "<JWT_TOKEN>",
+    "token_type": "bearer"
+  }
+  ```
+
+### 2. Ask Question (Main Pipeline)
+- **URL**: `POST /chat/ask`
 - **Body**:
   ```json
   {
@@ -215,8 +248,8 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 2. Fast/Fake Ask (Benchmarking Mock LLM)
-- **URL**: `POST /fake_ask`
+### 3. Fast/Fake Ask (Benchmarking Mock LLM)
+- **URL**: `POST /chat/fake_ask`
 - **Body**:
   ```json
   {
@@ -224,8 +257,8 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 3. Cache Statistics
-- **URL**: `GET /stats`
+### 4. Cache Statistics
+- **URL**: `GET /stats/stats`
 - **Response**:
   ```json
   {
@@ -234,24 +267,36 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 4. Clear Cache
-- **URL**: `POST /delte_cache`
-- **Body**:
+### 5. Clear Cache (Protected)
+- **URL**: `DELETE /delete/cache`
+- **Headers**: `Authorization: Bearer <JWT_TOKEN>`
+- **Response**:
   ```json
   {
-    "state": true
+    "message": "Cache deleted successfully."
   }
   ```
 
-### 5. Upload Custom Redaction Rules
-- **URL**: `POST /upload-redaction-rules/`
+### 6. Clear Fake Cache (Protected)
+- **URL**: `DELETE /delete/fake_cache`
+- **Headers**: `Authorization: Bearer <JWT_TOKEN>`
+- **Response**:
+  ```json
+  {
+    "message": "Fake Cache deleted successfully."
+  }
+  ```
+
+### 7. Upload Custom Redaction Rules
+- **URL**: `POST /rules/upload-redaction-rules`
 - **Form Data**: `file` (`.yaml` / `.yml`)
+- **Note**: Uploading a valid YAML rule file automatically triggers a real-time hot reload of the Presidio Analyzer recognizer registry.
 
 ---
 
 ## 🛡️ Custom PII Redaction Rules
 
-Custom YAML rules can be placed in `custom_recognizers/` or uploaded via the `/upload-redaction-rules/` endpoint.
+Custom YAML rules can be placed in `custom_recognizers/` or uploaded via the `/rules/upload-redaction-rules` endpoint.
 
 Example YAML structure:
 ```yaml
@@ -269,24 +314,24 @@ recognizers:
 
 ## 📊 Benchmarking
 
-Run the concurrent worker benchmark suite to test latency, throughput, and hit rates:
+Run the classification benchmarking framework against live or mock endpoints:
 
 ```bash
-python -m benchmark.execute_worker
+python -m benchmark.main
 ```
 
-Results are printed to the console and exported to `results.json`:
+The runner logs in to obtain a JWT token, passes questions from the Quora dataset (`benchmark/datasets/train.csv`), and evaluates the cache classification quality:
 
 ```text
-================ BENCHMARK SUMMARY ================
-  total_requests: 129
-  total_duration_sec: 1.25
-  requests_per_sec: 103.2
-  cache_hit_rate: 65.1%
-  avg_hit_latency_sec: 0.0084
-  avg_miss_latency_sec: 0.3120
-  errors_count: 0
-====================================================
+===== Benchmark Results =====
+true_positives: 45
+false_positives: 2
+true_negatives: 48
+false_negatives: 5
+accuracy: 0.9300
+precision: 0.9574
+recall: 0.9000
+f1_score: 0.9278
 ```
 
 ---
@@ -312,3 +357,4 @@ pytest testing/integration_testing/
 ## 📄 License
 
 This project is open-source and available under the standard MIT License.
+
