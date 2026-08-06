@@ -7,7 +7,7 @@ from benchmark.worker import Worker
 from benchmark.questions import QUESTIONS
 
 
-async def run_benchmark(num_workers: int = 1, link: str = "http://127.0.0.1:8000/ask", concurrent: bool = True,) -> None:
+async def run_benchmark(num_workers: int = 1, link: str = "http://127.0.0.1:8000/chat/ask", concurrent: bool = True,) -> None:
     workers = [Worker(worker_id=i) for i in range(num_workers)]
     start_total = time.perf_counter()
     tasks = [worker.asks(link=link, questions=QUESTIONS, concurrent=concurrent) for worker in workers]

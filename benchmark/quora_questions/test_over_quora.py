@@ -28,7 +28,7 @@ class ParallelBenchmarking:
         """Clear the server cache"""
         try:
             await client.post(
-                f"{self.base_url}/delte_cache", 
+                f"{self.base_url}/delete/cache", 
                 json=payload
             )
         except Exception as e:
@@ -51,14 +51,14 @@ class ParallelBenchmarking:
         # Send first question to populate cache
         _ = await worker._send_request(
             client=client,
-            link=f"{self.base_url}/fake_ask",
+            link=f"{self.base_url}/chat/fake_ask",
             question=pair.question1
         )
         
         # Send second question to check cache hit
         result = await worker._send_request(
             client=client,
-            link=f"{self.base_url}/fake_ask",
+            link=f"{self.base_url}/chat/fake_ask",
             question=pair.question2
         )
         
