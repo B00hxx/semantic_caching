@@ -204,6 +204,12 @@ def create_analyzer() -> AnalyzerEngine:
 analyzer = create_analyzer()
 
 
+def reload_analyzer() -> None:
+    global analyzer
+    analyzer = create_analyzer()
+
+    logger.info("Analyzer reloaded successfully.")
+
 # -----------------------------------------------------------------------------
 # FastAPI application
 # -----------------------------------------------------------------------------
@@ -279,6 +285,26 @@ def analyze(request: AnalyzeRequest) -> list[dict[str, Any]]:
             detail=str(exc),
         ) from exc
 
+@app.post("/reload")
+def reload() -> dict[str, str]:
+    """
+    Reload all built-in and custom recognizers.
+    """
+
+    try:
+        reload_analyzer()
+
+        return {
+            "status": "reloaded",
+        }
+
+    except Exception as exc:
+        logger.exception("Failed to reload analyzer")
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
 
 # -----------------------------------------------------------------------------
 # Local execution
