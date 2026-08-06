@@ -3,7 +3,7 @@ import json
 import statistics
 import time
 from typing import Any, Dict, List
-from benchmark.worker import Worker
+from benchmark.workers.worker import Worker
 from benchmark.questions import QUESTIONS
 
 

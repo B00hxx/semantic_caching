@@ -3,7 +3,7 @@ import httpx
 import pandas as pd
 from tqdm import tqdm
 from benchmark.quora_questions.question_pair import QuoraQuestionsPair
-from benchmark.worker import Worker
+from benchmark.workers.worker import Worker
 
 payload = {
     "state": "true"  
