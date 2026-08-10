@@ -1,0 +1,11 @@
+model_list:
+  - model_name: qwen
+    litellm_params:
+      model: ollama/qwen2.5:0.5b
+      api_base: http://ollama:11434
+
+litellm_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  ui_username: os.environ/UI_USERNAME
+  ui_password: os.environ/UI_PASSWORD
+  database_url: os.environ/DATABASE_URL

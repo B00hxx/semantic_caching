@@ -3,8 +3,6 @@ import ollama
 import os
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
 class RedisSettings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv('REDIS_HOST', 'localhost'))
     port: int = Field(default_factory=lambda: int(os.getenv('REDIS_PORT', 6379)))
@@ -42,7 +40,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        env_nested_delimiter='__'
+        env_nested_delimiter='__',
+        extra="ignore",
     )
     jwt_secret_key: str
     admin_username: str
