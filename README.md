@@ -17,7 +17,7 @@ This repository provides an end-to-end asynchronous pipeline that combines **Vec
 - [Configuration & Environment Variables](#-configuration--environment-variables)
 - [API Endpoints](#-api-endpoints)
 - [Custom PII Redaction Rules](#-custom-pii-redaction-rules)
-- [Benchmarking](#-benchmarking)
+- [Benchmarking & Visualizations](#-benchmarking--visualizations)
 - [Testing](#-testing)
 - [License](#-license)
 
@@ -138,6 +138,9 @@ This middleware solves these problems by:
 │   └── integration_testing/      # End-to-end integration tests against real services
 ├── utils/                        # Utility helper functions
 │   └── cosine_similarity.py      # NumPy cosine similarity calculation helper
+├── visualizations/               # Benchmark visualization scripts & generated charts
+│   ├── visualize_results.py      # Plot generation script for performance metrics
+│   └── results.json              # Evaluated threshold benchmark results
 ├── config.py                     # Centralized settings & Pydantic env config
 ├── Dockerfile                    # Container definition for FastAPI app
 ├── docker-compose.yml            # Multi-service stack composition
@@ -312,7 +315,9 @@ recognizers:
 
 ---
 
-## 📊 Benchmarking
+## 📊 Benchmarking & Visualizations
+
+### 🏃 Running Benchmarks
 
 Run the classification benchmarking framework against live or mock endpoints:
 
@@ -333,6 +338,36 @@ precision: 0.9574
 recall: 0.9000
 f1_score: 0.9278
 ```
+
+### 📈 Performance & Threshold Visualizations
+
+To analyze performance across various similarity thresholds, run the visualization script:
+
+```bash
+python visualizations/visualize_results.py
+```
+
+This generates comprehensive analysis plots based on the evaluated benchmark dataset:
+
+#### 1. Performance Metrics vs. Similarity Threshold
+Shows how **Accuracy**, **Precision**, **Recall**, and **F1 Score** evolve across similarity thresholds (ranging from 0.50 to 0.95). As the similarity threshold increases, precision improves while recall decreases.
+
+![Performance vs Threshold](performance_vs_threshold.png)
+
+#### 2. F1 Score Optimization
+Highlights the F1 Score curve across similarity thresholds, pinpointing the optimal threshold value that balances precision and recall.
+
+![F1 Score vs Threshold](f1_vs_threshold.png)
+
+#### 3. Precision–Recall Tradeoff
+Displays the trade-off curve between Precision and Recall with annotations for each evaluated similarity threshold.
+
+![Precision-Recall Tradeoff](precision_recall_tradeoff.png)
+
+#### 4. Confusion Matrix Breakdown
+Tracks the exact counts of **True Positives (TP)**, **False Positives (FP)**, **True Negatives (TN)**, and **False Negatives (FN)** across different threshold values.
+
+![Confusion Matrix Breakdown](confusion_matrix_vs_threshold.png)
 
 ---
 

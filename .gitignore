@@ -52,21 +52,35 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
-# Redis dump
+# Redis & Docker runtime data
 dump.rdb
+redis_data/
+data/
 
 # Local Ollama runtime files
 ollama/
 
-# Temporary files
+# Benchmark temporary outputs & logs
+benchmark_outputs/
+*.out
+
+# Visualizations - track specific README charts
+!performance_vs_threshold.png
+!f1_vs_threshold.png
+!precision_recall_tradeoff.png
+!confusion_matrix_vs_threshold.png
+
+# Temporary & editor files
 *.tmp
 *.bak
 *.swp
+*.swo
 *~
+.project
+.settings/
 
 # Optional: ignore large model artifacts
 # models/
 # *.bin
 # *.gguf
 # *.onnx
-

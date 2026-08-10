@@ -21,7 +21,6 @@ class RedisSettings(BaseModel):
 
 class OllamaSettings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
-
     def get_client(self) -> ollama.AsyncClient:
         return ollama.AsyncClient(
             host=self.host
