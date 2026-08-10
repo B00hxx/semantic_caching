@@ -10,7 +10,7 @@ from semantic_caching.vector_store_services.redis_service import RedisService
 from semantic_caching.query import QueryProcessor
 from dotenv import load_dotenv
 from semantic_caching.llm_services.litellm.lite_llm_service import LiteLLMService
-
+from semantic_caching.embedding_services.litellm_embedder.litellm_embedding_service import LiteLLMEmbedder
 
 MODELS = {
     "chat" : "qwen2.5:0.5b",
@@ -34,6 +34,12 @@ async def lifespan(app : FastAPI):
         model_name= settings.lite_llm_settings.model_name,
         link="http://litellm:4000"
     )
+    
+    litellm_embedding_service = LiteLLMEmbedder(
+        api_key = settings.lite_llm_settings.embedding_model_key,
+        model_name = settings.lite_llm_settings.embedding_model_name,
+        link="http://litellm:4000"
+    )
     lite_redis = RedisService(client=redis_client, dimension=1024, prefix="lite", namespace="lite_llm")
     
     await testing_redis.initialize()
@@ -44,7 +50,7 @@ async def lifespan(app : FastAPI):
 
     testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
     fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_fake_redis, threshold=0.75, query_processor=query_processor)
-    lite_testing = SemanticCaching(llm_model=lite_llm_service, embedding_model=testing_embedding_model, vector_store=lite_redis, query_processor=query_processor, threshold=0.8)
+    lite_testing = SemanticCaching(llm_model=lite_llm_service, embedding_model=litellm_embedding_service, vector_store=lite_redis, query_processor=query_processor, threshold=0.8)
     
     app.state.semantic_caching_service = testing
     app.state.redis_client = redis_client

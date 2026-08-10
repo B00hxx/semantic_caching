@@ -64,7 +64,7 @@ class RedisService(VectorStore):
             cache_id,
             mapping={
                 "question": entry.question,
-                "embedding": entry.embedding.astype(np.float32).tobytes(),
+                "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
                 "answer": entry.answer,
                 "time": str(entry.created_at),
                 "ttl": entry.ttl_seconds,
@@ -104,7 +104,7 @@ class RedisService(VectorStore):
         results = await self.client.ft(f"{self.prefix}_index").search(
             query,
             query_params={
-                "vec": query_embedding.astype(np.float32).tobytes(),
+                "vec": np.asarray(query_embedding, dtype=np.float32).tobytes(),
                 "ns": self.namespace,
             }
         )

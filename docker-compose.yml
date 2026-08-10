@@ -93,6 +93,8 @@ services:
       CUSTOM_RULES_DIR: /app/custom-rules
       API_KEY: ${API_KEY}
       MODEL_NAME: ${MODEL_NAME}
+      API_KEY_EMB: ${API_KEY_EMB}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
     depends_on:
       - redis
       - ollama

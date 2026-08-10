@@ -36,6 +36,9 @@ class PresidioSettings(BaseModel):
 class LiteLLMSettings(BaseModel):
     model_name : str = Field(default_factory=lambda: os.getenv('MODEL_NAME'))
     api_key : str = Field(default_factory=lambda: os.getenv('API_KEY'))
+    embedding_model_name :str  = Field(default_factory=lambda: os.getenv('EMBEDDING_MODEL_NAME'))
+    embedding_model_key : str = Field(default_factory=lambda: os.getenv('API_KEY_EMB'))
+    
 class Settings(BaseSettings):
     lite_llm_settings : LiteLLMSettings = Field(default_factory=LiteLLMSettings)
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
