@@ -4,7 +4,7 @@ services:
       ports:
         - "4000:4000"
       volumes:
-        - ./semantic_caching/llm_services/litellm/config.yaml:/app/config.yaml
+        - ./config.yaml:/app/config.yaml
       environment:
         LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
         UI_USERNAME: ${UI_USERNAME}
