@@ -91,6 +91,8 @@ services:
       ANALYZER_URL: http://presidio-analyzer:3000/analyze
       ANONYMIZER_URL: http://presidio-anonymizer:3000/anonymize
       CUSTOM_RULES_DIR: /app/custom-rules
+      API_KEY: ${API_KEY}
+      MODEL_NAME: ${MODEL_NAME}
     depends_on:
       - redis
       - ollama

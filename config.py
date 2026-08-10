@@ -3,6 +3,7 @@ import ollama
 import os
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 class RedisSettings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv('REDIS_HOST', 'localhost'))
     port: int = Field(default_factory=lambda: int(os.getenv('REDIS_PORT', 6379)))
@@ -31,8 +32,12 @@ class PresidioSettings(BaseModel):
     anonymizer_url: str = Field(default_factory=lambda: os.getenv('ANONYMIZER_URL', 'http://localhost:5001/anonymize'))
     custom_rules_dir: str = Field(default_factory=lambda: os.getenv('CUSTOM_RULES_DIR', './custom_recognizers'))
     url_analyzer: str = "http://presidio-analyzer:3000"
-  
+
+class LiteLLMSettings(BaseModel):
+    model_name : str = Field(default_factory=lambda: os.getenv('MODEL_NAME'))
+    api_key : str = Field(default_factory=lambda: os.getenv('API_KEY'))
 class Settings(BaseSettings):
+    lite_llm_settings : LiteLLMSettings = Field(default_factory=LiteLLMSettings)
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)
     presidio: PresidioSettings = Field(default_factory=PresidioSettings)

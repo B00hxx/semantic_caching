@@ -9,6 +9,7 @@ from semantic_caching.embedding_services.ollama_embedding import OllamaEmbedding
 from semantic_caching.vector_store_services.redis_service import RedisService
 from semantic_caching.query import QueryProcessor
 from dotenv import load_dotenv
+from semantic_caching.llm_services.litellm.lite_llm_service import LiteLLMService
 
 
 MODELS = {
@@ -28,16 +29,27 @@ async def lifespan(app : FastAPI):
     fake_llm = FakeLLMToDeploy()
     query_processor = QueryProcessor()
     
+    lite_llm_service = LiteLLMService(
+        api_key= settings.lite_llm_settings.api_key,
+        model_name= settings.lite_llm_settings.model_name,
+        link="http://litellm:4000"
+    )
+    lite_redis = RedisService(client=redis_client, dimension=1024, prefix="lite", namespace="lite_llm")
+    
     await testing_redis.initialize()
     await testing_fake_redis.initialize()
+    await lite_redis.initialize()
+    
+    
 
     testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
     fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_fake_redis, threshold=0.75, query_processor=query_processor)
+    lite_testing = SemanticCaching(llm_model=lite_llm_service, embedding_model=testing_embedding_model, vector_store=lite_redis, query_processor=query_processor, threshold=0.8)
     
     app.state.semantic_caching_service = testing
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
-
+    app.state.lite_testing = lite_testing
 
     print("Started the pipeline with success!")
     
