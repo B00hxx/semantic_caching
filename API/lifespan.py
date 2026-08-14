@@ -3,41 +3,49 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from config import settings
 from semantic_caching.semantic_caching import SemanticCaching
-from semantic_caching.llm_services.ollama_service import OllamaLLM
 from semantic_caching.llm_services.fake_llm_to_deploy import FakeLLMToDeploy
-from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
 from semantic_caching.vector_store_services.redis_service import RedisService
 from semantic_caching.query import QueryProcessor
+from semantic_caching.llm_services.lite_llm_service import LiteLLMService
+from semantic_caching.embedding_services.litellm_embedding_service import LiteLLMEmbedder
 from dotenv import load_dotenv
-
-
-MODELS = {
-    "chat" : "qwen2.5:0.5b",
-    "emb" : "qwen3-embedding:0.6b"
-}
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     redis_client = settings.redis_client.get_client()
-    ollama_client = settings.ollama_client.get_client()
-
-    testing_llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
-    testing_embedding_model = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
-    testing_redis = RedisService(client=redis_client, dimension=1024, prefix="cache", namespace="production")
+    lite_redis = RedisService(client=redis_client, dimension=1024, prefix="lite", namespace="lite_llm")
     testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache", namespace="testing")
-    fake_llm = FakeLLMToDeploy()
     query_processor = QueryProcessor()
-    
-    await testing_redis.initialize()
-    await testing_fake_redis.initialize()
 
-    testing = SemanticCaching(llm_model=testing_llm, embedding_model=testing_embedding_model, vector_store=testing_redis, threshold=0.75, query_processor=query_processor)
-    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=testing_embedding_model, vector_store=testing_fake_redis, threshold=0.75, query_processor=query_processor)
+    #LLMs
+    lite_llm_service = LiteLLMService(
+        api_key= settings.lite_llm_settings.api_key,
+        model_name= settings.lite_llm_settings.model_name,
+        link="http://litellm:4000"
+    )
+    fake_llm = FakeLLMToDeploy()
     
-    app.state.semantic_caching_service = testing
+    
+
+    #embedding services
+    litellm_embedding_service = LiteLLMEmbedder(
+        api_key = settings.lite_llm_settings.embedding_model_key,
+        model_name = settings.lite_llm_settings.embedding_model_name,
+        link="http://litellm:4000"
+    )
+    
+    
+    await testing_fake_redis.initialize()
+    await lite_redis.initialize()
+    
+    
+
+    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=litellm_embedding_service, vector_store=testing_fake_redis, threshold=0.95, query_processor=query_processor)
+    lite_testing = SemanticCaching(llm_model=lite_llm_service, embedding_model=litellm_embedding_service, vector_store=lite_redis, query_processor=query_processor, threshold=0.8)
+    
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
-
+    app.state.lite_testing = lite_testing
 
     print("Started the pipeline with success!")
     

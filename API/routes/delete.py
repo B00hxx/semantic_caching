@@ -7,7 +7,7 @@ router = APIRouter(prefix="/delete",tags=["delete"])
 
 @router.delete("/cache")
 async def delete_cache(request: Request,current_user: User = Depends(get_current_admin)):
-    await request.app.state.semantic_caching_service.vector_store.empty_database()
+    await request.app.state.lite_testing.vector_store.empty_database()
     return {
         "message": "Cache deleted successfully."
     }

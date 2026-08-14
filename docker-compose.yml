@@ -4,7 +4,7 @@ services:
       ports:
         - "4000:4000"
       volumes:
-        - ./semantic_caching/llm_services/litellm/config.yaml:/app/config.yaml
+        - ./config.yaml:/app/config.yaml
       environment:
         LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
         UI_USERNAME: ${UI_USERNAME}
@@ -91,6 +91,10 @@ services:
       ANALYZER_URL: http://presidio-analyzer:3000/analyze
       ANONYMIZER_URL: http://presidio-anonymizer:3000/anonymize
       CUSTOM_RULES_DIR: /app/custom-rules
+      API_KEY: ${API_KEY}
+      MODEL_NAME: ${MODEL_NAME}
+      API_KEY_EMB: ${API_KEY_EMB}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
     depends_on:
       - redis
       - ollama
