@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     redis_client = settings.redis_client.get_client()
-    lite_redis = RedisService(client=redis_client, dimension=1024, prefix="lite", namespace="lite_llm")
-    testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache", namespace="testing")
+    lite_redis = RedisService(client=redis_client, dimension=1024, prefix="lite")
+    testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache")
     query_processor = QueryProcessor()
 
     #LLMs
@@ -40,8 +40,17 @@ async def lifespan(app : FastAPI):
     
     
 
-    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=litellm_embedding_service, vector_store=testing_fake_redis, threshold=0.95, query_processor=query_processor)
-    lite_testing = SemanticCaching(llm_model=lite_llm_service, embedding_model=litellm_embedding_service, vector_store=lite_redis, query_processor=query_processor, threshold=0.8)
+    fake_testing = SemanticCaching(llm_model=fake_llm, 
+                                   embedding_model=litellm_embedding_service, 
+                                   vector_store=testing_fake_redis, 
+                                   threshold=0.95, 
+                                   query_processor=query_processor,
+                                   namespace="fake_test")
+    lite_testing = SemanticCaching(llm_model=lite_llm_service, 
+                                   embedding_model=litellm_embedding_service, 
+                                   vector_store=lite_redis, 
+                                   query_processor=query_processor, 
+                                   threshold=0.8)
     
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
