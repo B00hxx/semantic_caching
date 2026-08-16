@@ -50,13 +50,13 @@ class SemanticCaching:
                 logger.info("Entry being added to cache")
                 await self.vector_store.add_entry(entry_retrieval)
                 if self.postgres:
-                    try:
+                    try: 
                         entry_persistent = CacheEntryForPersistence(
                                 question=query,
                                 embedding=embedded,
                                 answer=answer_by_llm,
                                 embedding_model=self.embedding.model_name,
-                                embedding_dimension=int(self.embedding.embedding_dimension),
+                                embedding_dimension = int(self.embedding.embedding_dimension),
                                 namespace=self.namespace,
                                 ttl_seconds=entry_retrieval.ttl_seconds,
                                 id=entry_retrieval.id,
@@ -82,8 +82,18 @@ class SemanticCaching:
                 }
         else:
             logger.info("PII discovered, send to LLM directly")
-            print(query)
             answer_by_llm = await self.llm.generate(query=query)
+            redacted_query = self.query_processor.redact(query = query, analyzer_results=spans)
+            entry_persistent = CacheEntryForPersistence(
+                                            question=redacted_query,
+                                            embedding=[0],
+                                            answer=answer_by_llm,
+                                            embedding_model=self.embedding.model_name,
+                                            embedding_dimension = int(self.embedding.embedding_dimension),
+                                            namespace="None",
+                                            ttl_seconds=0,
+                                        )
+            await self.postgres.save_entry(entry_persistent)
             return {
                 "cache_hit" : False,
                 "cache_bypassed" : True,

@@ -22,3 +22,24 @@ class QueryProcessor:
                 raise ValueError(f"Unexpected analyzer response format: {type(analyzer_results)}")
 
             return analyzer_results
+    
+    def redact(self, query: str, analyzer_results: list, replacement: str = "<REDACTED>") -> str:
+        results = sorted(
+            analyzer_results,
+            key=lambda x: x["start"],
+            reverse=True
+        )
+
+        redacted_query = query
+
+        for result in results:
+            start = result["start"]
+            end = result["end"]
+
+            redacted_query = (
+                redacted_query[:start]
+                + replacement
+                + redacted_query[end:]
+            )
+
+        return redacted_query
