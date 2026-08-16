@@ -19,7 +19,7 @@ services:
       - app-network
 
   postgres:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     container_name: litellm-postgres
     environment:
       POSTGRES_DB: litellm
@@ -31,6 +31,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init-cache-db.sh:/docker-entrypoint-initdb.d/init-cache-db.sh
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     networks:
       - app-network
 
