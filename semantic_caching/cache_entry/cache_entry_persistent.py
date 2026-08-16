@@ -8,12 +8,13 @@ class CacheEntryForPersistence(CacheEntry):
                  question : str, 
                  embedding : list[float], 
                  answer : str, 
-                 ttl_seconds = 3600, 
+                 namespace : str,
+                 ttl_seconds : int = 3600, 
                  id : UUID | None = None,
-                 
                  ):
         super().__init__(question, embedding, answer, ttl_seconds, id)
         self.embedding_model = embedding_model
         self.embedding_dimension = embedding_dimension
+        self.namespace = namespace
     def storage_type(self):
             return "Persistent Storage"

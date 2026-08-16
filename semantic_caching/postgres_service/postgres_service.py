@@ -1,12 +1,10 @@
 import asyncpg
+import asyncio
+from pgvector.asyncpg import register_vector
 from ..cache_entry.cache_entry_persistent import CacheEntryForPersistence
 
 class PostgresService:
-    def __init__(self, host : str,
-                 port : int,
-                 database : str,
-                 user : str,
-                 password : str):
+    def __init__(self, host : str, database : str, user : str, password : str, port : int = 5432):
         self.host = host
         self.port = port
         self.database = database
@@ -14,11 +12,37 @@ class PostgresService:
         self.password = password
         self.pool = None
     
-    async def initialize(self):
-        self.pool = await asyncpg.create_pool(
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            user=self.user,
-            password=self.password,
+    async def initialize(self) -> None:
+        self.pool = await asyncpg.create_pool(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password, init=register_vector,)
+    
+    async def close(self) -> None:
+        if self.pool:
+            await self.pool.close()
+
+    async def save_entry(self, entry: CacheEntryForPersistence):
+        async with self.pool.acquire() as connection:
+            await connection.execute(
+            """
+            INSERT INTO cache_entries (
+                id,
+                question,
+                embedding,
+                embedding_model,
+                embedding_dimension,
+                answer,
+                namespace,
+                created_at,
+                ttl_seconds
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+            """,
+            entry.id,
+            entry.question,
+            entry.embedding,
+            entry.embedding_model,
+            entry.embedding_dimension,
+            entry.answer,
+            entry.namespace,
+            entry.created_at,
+            entry.ttl_seconds,
         )
