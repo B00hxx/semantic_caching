@@ -27,7 +27,26 @@ class SemanticCaching:
         if not namespace:
             raise ValueError("namespace cannot be empty")
         self.namespace = namespace
-
+    
+    async def initialize(self, limit : int = 10):
+        if not self.postgres:
+            return 0
+        if self.postgres:
+            top_entries = await self.postgres.get_top_entries(embedding_model = self.embedding.model_name, 
+                                          embedding_dimension=int(self.embedding.embedding_dimension), 
+                                          namespace=self.namespace, 
+                                          limit=limit)
+            top_entries_transformed = [CacheEntryForRetrieval(question=entry.question, 
+                                                              embedding=entry.embedding, 
+                                                              answer=entry.answer, 
+                                                              ttl_seconds=entry.ttl_seconds, 
+                                                              namespace=entry.namespace, 
+                                                              id=entry.id) 
+                                       for entry in top_entries]
+            for entry in top_entries_transformed:
+                await self.vector_store.add_entry(entry)
+        logger.info("Loaded %d cache entries from PostgreSQL", len(top_entries))
+        return len(top_entries)
     async def get_answers(self, query:str)->dict:
         spans = []
         if self.query_processor is not None:

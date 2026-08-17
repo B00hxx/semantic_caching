@@ -57,6 +57,8 @@ async def lifespan(app : FastAPI):
                                    threshold=0.8,
                                    postgres=postgres_service)
     
+    await lite_testing.initialize(limit=10)
+    
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
     app.state.lite_testing = lite_testing
@@ -69,7 +71,7 @@ async def lifespan(app : FastAPI):
     try:
         feature_flag = (os.getenv("DELETE_ON_SHUTDOWN", "false").lower() == "true")
         if feature_flag:
-            await app.state.semantic_caching_service.vector_store.empty_database()
+            await app.state.lite_testing.vector_store.empty_database()
             print("The database is clear!")
         else:
             print("keeping the database!")

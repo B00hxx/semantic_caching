@@ -79,7 +79,7 @@ class PostgresService:
             CacheEntryForPersistence(
                 id=row["id"],
                 question=row["question"],
-                embedding=row["embedding"],
+                embedding=row["embedding"].to_list(),
                 answer=row["answer"],
                 embedding_model=row["embedding_model"],
                 embedding_dimension=row["embedding_dimension"],
