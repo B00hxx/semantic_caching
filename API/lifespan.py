@@ -82,3 +82,7 @@ async def lifespan(app : FastAPI):
             await redis_client.aclose()
         except Exception as exc:
             print(f"Redis client close skipped: {exc}")
+        try:
+            await postgres_service.close()
+        except Exception as exc:
+            print(f"PostgreSQL close skipped: {exc}")

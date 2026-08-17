@@ -1,10 +1,28 @@
 import os
 import httpx
+
+SENSITIVE_ENTITIES = {
+    "PERSON",
+    "EMAIL_ADDRESS",
+    "PHONE_NUMBER",
+    "CREDIT_CARD",
+    "IBAN_CODE",
+    "IP_ADDRESS",
+    "MEDICAL_LICENSE",
+    "EMPLOYEE_ID",
+    "CONFIDENTIAL_PROJECT",
+}
 class QueryProcessor:
     """Figures out if there is any sensitive information using analyzer microservices."""
     def __init__(self, analyzer_url: str = None, timeout: float = 10):
         self.analyzer_url = analyzer_url or os.getenv("ANALYZER_URL", "http://localhost:5002/analyze")
         self.timeout = timeout
+    
+    def contains_sensitive_data(self, spans) -> bool:
+        return any(
+        span["entity_type"] in SENSITIVE_ENTITIES
+        for span in spans
+        )
     
     async def process(self, query : str) -> list:
         async with httpx.AsyncClient(timeout=self.timeout) as client:

@@ -1,10 +1,16 @@
 import asyncpg
 import asyncio
+from uuid import UUID
 from pgvector.asyncpg import register_vector
 from ..cache_entry.cache_entry_persistent import CacheEntryForPersistence
 
 class PostgresService:
-    def __init__(self, host : str, database : str, user : str, password : str, port : int = 5432):
+    def __init__(self, 
+                 host : str, 
+                 database : str, 
+                 user : str, 
+                 password : str, 
+                 port : int = 5432):
         self.host = host
         self.port = port
         self.database = database
@@ -13,7 +19,12 @@ class PostgresService:
         self.pool = None
     
     async def initialize(self) -> None:
-        self.pool = await asyncpg.create_pool(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password, init=register_vector,)
+        self.pool = await asyncpg.create_pool(host=self.host, 
+                                              port=self.port, 
+                                              database=self.database, 
+                                              user=self.user, 
+                                              password=self.password, 
+                                              init=register_vector,)
     
     async def close(self) -> None:
         if self.pool:
@@ -48,7 +59,11 @@ class PostgresService:
             entry.ttl_seconds,
             entry.hit_count
         )
-    async def get_top_entries(self, embedding_model: str, embedding_dimension: int, namespace: str, limit: int) -> list[CacheEntryForPersistence]:
+    async def get_top_entries(self, 
+                              embedding_model: str, 
+                              embedding_dimension: int, 
+                              namespace: str, 
+                              limit: int) -> list[CacheEntryForPersistence]:
         async with self.pool.acquire() as connection:
             rows = await connection.fetch(
             """
@@ -89,3 +104,16 @@ class PostgresService:
             )
             for row in rows
         ]
+    async def update_hit_count(self, id : UUID):
+        async with self.pool.acquire() as connection:
+            await connection.execute(
+            """
+            UPDATE cache_entries
+            SET
+                hit_count = hit_count + 1,
+                last_hit_at = NOW(),
+                last_accessed_at = NOW()
+            WHERE id = $1;
+            """,
+            id
+        )
