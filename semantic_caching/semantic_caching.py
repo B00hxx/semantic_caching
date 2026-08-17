@@ -88,8 +88,8 @@ class SemanticCaching:
                                             question=redacted_query,
                                             embedding=[0],
                                             answer=answer_by_llm,
-                                            embedding_model=self.embedding.model_name,
-                                            embedding_dimension = int(self.embedding.embedding_dimension),
+                                            embedding_model= "None",
+                                            embedding_dimension = 0,
                                             namespace="None",
                                             ttl_seconds=0,
                                         )
