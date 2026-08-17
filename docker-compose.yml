@@ -1,33 +1,57 @@
 services:
   litellm:
-      image: ghcr.io/berriai/litellm:main-latest
-      ports:
-        - "4000:4000"
-      volumes:
-        - ./config.yaml:/app/config.yaml
-      environment:
-        LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
-        UI_USERNAME: ${UI_USERNAME}
-        UI_PASSWORD: ${UI_PASSWORD}
-        DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
-      depends_on:
-       - postgres
-      command:
-        - "--config"
-        - "/app/config.yaml"
-      networks:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      UI_USERNAME: ${UI_USERNAME}
+      UI_PASSWORD: ${UI_PASSWORD}
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
+    depends_on:
+      - postgres
+    command:
+      - "--config"
+      - "/app/config.yaml"
+    networks:
       - app-network
+
   postgres:
-   image: postgres:17
-   container_name: litellm-postgres
-   environment:
-    POSTGRES_DB: litellm
-    POSTGRES_USER: litellm
-    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-   volumes:
-    - postgres_data:/var/lib/postgresql/data
-   networks:
-    - app-network
+    image: pgvector/pgvector:pg17
+    container_name: litellm-postgres
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CACHE_POSTGRES_DB: ${CACHE_POSTGRES_DB}
+      CACHE_POSTGRES_USER: ${CACHE_POSTGRES_USER}
+      CACHE_POSTGRES_PASSWORD: ${CACHE_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-cache-db.sh:/docker-entrypoint-initdb.d/init-cache-db.sh
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - app-network
+
+  pgadmin:
+    image: dpage/pgadmin4:9.8
+    container_name: pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: demo@example.com
+      PGADMIN_DEFAULT_PASSWORD: secret
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - app-network
+
   redis:
     image: redis/redis-stack-server:latest
     container_name: redis
@@ -35,6 +59,7 @@ services:
       - "6380:6379"
     networks:
       - app-network
+
   redisinsight:
     image: redis/redisinsight:latest
     container_name: redisinsight
@@ -95,6 +120,12 @@ services:
       MODEL_NAME: ${MODEL_NAME}
       API_KEY_EMB: ${API_KEY_EMB}
       EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
+      CACHE_POSTGRES_HOST: postgres
+      CACHE_POSTGRES_PORT: 5432
+      CACHE_POSTGRES_DB: ${CACHE_POSTGRES_DB}
+      CACHE_POSTGRES_USER: ${CACHE_POSTGRES_USER}
+      CACHE_POSTGRES_PASSWORD: ${CACHE_POSTGRES_PASSWORD}
+      EMBEDDING_MODEL_DIMENSION: ${EMBEDDING_MODEL_DIMENSION}
     depends_on:
       - redis
       - ollama
@@ -111,6 +142,7 @@ volumes:
   ollama:
   presidio-rules:
   postgres_data:
+  pgadmin_data:
 
 networks:
   app-network:

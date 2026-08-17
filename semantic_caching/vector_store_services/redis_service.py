@@ -4,22 +4,16 @@ import redis.asyncio as redis
 from redis.commands.search.field import VectorField, TagField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
-from ..cache_entry import CacheEntry
 from .vector_store_services import VectorStore
 from .vector_search_result import VectorSearchResult
-
-
+from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
 class RedisService(VectorStore):
-    def __init__(self, client: redis.Redis, dimension: int, prefix : str, namespace: str = "default"):
+    def __init__(self, client: redis.Redis, dimension: int, prefix : str):
         self.client = client
         self.status = "Not initialized yet!"
         self.dimension = dimension
         self.prefix = prefix
-        if not namespace:
-            raise ValueError("namespace cannot be empty")
-        self.namespace = namespace
-        # Removed self.create_index() because __init__ cannot await async functions
-
+    
     async def initialize(self) -> None:
         """Call this method in lifespan after creating the RedisService instance."""
         try:
@@ -58,17 +52,17 @@ class RedisService(VectorStore):
         except Exception as e:
             print("INDEX CREATION LOG:", e)
 
-    async def add_entry(self, entry: CacheEntry) -> str:
-        cache_id = f"{self.prefix}:{str(uuid.uuid4())}" 
+    async def add_entry(self, entry: CacheEntryForRetrieval) -> str:
+        cache_id = f"{self.prefix}:{entry.id}" 
         await self.client.hset(
             cache_id,
             mapping={
                 "question": entry.question,
                 "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
                 "answer": entry.answer,
-                "time": str(entry.created_at),
+                "time": entry.created_at.isoformat(),
                 "ttl": entry.ttl_seconds,
-                "namespace" : self.namespace
+                "namespace" : entry.namespace
             }
         )
         await self.client.expire(cache_id, entry.ttl_seconds)
@@ -92,20 +86,20 @@ class RedisService(VectorStore):
         if keys:
             await self.client.delete(*keys)
         return len(keys)
-    async def search(self, query_embedding: np.ndarray, threshold: float):
+    async def search(self, query_embedding: np.ndarray, threshold: float, namespace : str):
         query = (
             Query(
                 "(@namespace:{$ns})=>[KNN 1 @embedding $vec AS score]"
             )
             .sort_by("score")
-            .return_fields("question", "answer", "score", "time")
+            .return_fields("question", "answer", "score", "time", "namespace")
             .dialect(2)
         )
         results = await self.client.ft(f"{self.prefix}_index").search(
             query,
             query_params={
                 "vec": np.asarray(query_embedding, dtype=np.float32).tobytes(),
-                "ns": self.namespace,
+                "ns": namespace,
             }
         )
         if not results.docs:
@@ -122,7 +116,7 @@ class RedisService(VectorStore):
                 identifier = result.id,
                 time = result.time,
                 ttl = await self.ttl(result.id),
-                namespace=self.namespace
+                namespace= result.namespace
             )
             return vector_search_result
         return None
