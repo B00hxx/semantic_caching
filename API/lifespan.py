@@ -60,6 +60,7 @@ async def lifespan(app : FastAPI):
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
     app.state.lite_testing = lite_testing
+    app.state.postgres_service = postgres_service
 
     print("Started the pipeline with success!")
     
