@@ -1,10 +1,16 @@
 import asyncpg
 import asyncio
+from uuid import UUID
 from pgvector.asyncpg import register_vector
 from ..cache_entry.cache_entry_persistent import CacheEntryForPersistence
 
 class PostgresService:
-    def __init__(self, host : str, database : str, user : str, password : str, port : int = 5432):
+    def __init__(self, 
+                 host : str, 
+                 database : str, 
+                 user : str, 
+                 password : str, 
+                 port : int = 5432):
         self.host = host
         self.port = port
         self.database = database
@@ -13,7 +19,12 @@ class PostgresService:
         self.pool = None
     
     async def initialize(self) -> None:
-        self.pool = await asyncpg.create_pool(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password, init=register_vector,)
+        self.pool = await asyncpg.create_pool(host=self.host, 
+                                              port=self.port, 
+                                              database=self.database, 
+                                              user=self.user, 
+                                              password=self.password, 
+                                              init=register_vector,)
     
     async def close(self) -> None:
         if self.pool:
@@ -32,9 +43,10 @@ class PostgresService:
                 answer,
                 namespace,
                 created_at,
-                ttl_seconds
+                ttl_seconds,
+                hit_count
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
             """,
             entry.id,
             entry.question,
@@ -45,4 +57,63 @@ class PostgresService:
             entry.namespace,
             entry.created_at,
             entry.ttl_seconds,
+            entry.hit_count
+        )
+    async def get_top_entries(self, 
+                              embedding_model: str, 
+                              embedding_dimension: int, 
+                              namespace: str, 
+                              limit: int) -> list[CacheEntryForPersistence]:
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch(
+            """
+            SELECT
+                id,
+                question,
+                embedding,
+                embedding_model,
+                embedding_dimension,
+                answer,
+                namespace,
+                created_at,
+                ttl_seconds,
+                hit_count
+                FROM cache_entries
+                WHERE embedding_model = $1
+                AND embedding_dimension = $2
+                AND namespace = $3
+                ORDER BY hit_count DESC
+                LIMIT $4;
+            """,
+                embedding_model,
+                embedding_dimension,
+                namespace,
+                limit,
+        )
+            return [
+            CacheEntryForPersistence(
+                id=row["id"],
+                question=row["question"],
+                embedding=row["embedding"].to_list(),
+                answer=row["answer"],
+                embedding_model=row["embedding_model"],
+                embedding_dimension=row["embedding_dimension"],
+                namespace=row["namespace"],
+                ttl_seconds=row["ttl_seconds"],
+                hit_count=row["hit_count"],
+            )
+            for row in rows
+        ]
+    async def update_hit_count(self, id : UUID):
+        async with self.pool.acquire() as connection:
+            await connection.execute(
+            """
+            UPDATE cache_entries
+            SET
+                hit_count = hit_count + 1,
+                last_hit_at = NOW(),
+                last_accessed_at = NOW()
+            WHERE id = $1;
+            """,
+            id
         )

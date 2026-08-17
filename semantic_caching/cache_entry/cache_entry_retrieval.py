@@ -17,6 +17,4 @@ class CacheEntryForRetrieval(CacheEntry):
         if not namespace:
             raise ValueError("namespace cannot be empty")
         self.namespace = namespace
-    def storage_type(self):
-        return "Hot Storage"
         

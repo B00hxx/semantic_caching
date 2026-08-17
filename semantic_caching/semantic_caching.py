@@ -6,8 +6,9 @@ from .vector_store_services.vector_store_services import VectorStore
 from .query import QueryProcessor
 from .postgres_service.postgres_service import PostgresService, CacheEntryForPersistence
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 class SemanticCaching:
     def __init__(self, 
                  llm_model: LLM, 
@@ -27,13 +28,40 @@ class SemanticCaching:
         if not namespace:
             raise ValueError("namespace cannot be empty")
         self.namespace = namespace
-
+    
+    async def initialize(self, limit : int = 10):
+        if not self.postgres:
+            return 0
+        top_entries = await self.postgres.get_top_entries(embedding_model = self.embedding.model_name, 
+                                          embedding_dimension=int(self.embedding.embedding_dimension), 
+                                          namespace=self.namespace, 
+                                          limit=limit)
+        top_entries_transformed = [CacheEntryForRetrieval(question=entry.question, 
+                                                              embedding=entry.embedding, 
+                                                              answer=entry.answer, 
+                                                              ttl_seconds=entry.ttl_seconds, 
+                                                              namespace=entry.namespace, 
+                                                              id=entry.id) 
+                                       for entry in top_entries]
+        for entry in top_entries_transformed:
+            await self.vector_store.add_entry(entry)
+        logger.info("Loaded %d cache entries from PostgreSQL", len(top_entries))
+        return len(top_entries)
     async def get_answers(self, query:str)->dict:
         spans = []
         if self.query_processor is not None:
             logger.info("Query sent to Presidio Analyzer...")
             spans = await self.query_processor.process(query)
-        if spans == []:
+            logger.info("Presidio spans: %s", spans)
+        has_sensitive_data = (self.query_processor is not None and self.query_processor.contains_sensitive_data(spans))
+        if not has_sensitive_data:
+            for span in spans:
+                logger.info(
+                        "Detected entity=%s score=%.3f text=%r",
+                        span["entity_type"],
+                        span["score"],
+                        query[span["start"]:span["end"]],
+                        )
             logger.info("No sensitive information discovered!")
             embedded = await self.embedding.embed(query)
             logger.info("Query embedded")
@@ -72,6 +100,12 @@ class SemanticCaching:
                 }
             else:
                 logger.info("Good match was found, retrieving from Store")
+                try:
+                    id = response_from_vector_store.identifier.split(":", 1)[-1]
+                    await self.postgres.update_hit_count(id = id)
+                except Exception:
+                    logger.exception("Failed to update cache hit metrics")
+                
                 return {
                     "cache_hit" : True,
                     "cosine_distance" : response_from_vector_store.score,
