@@ -29,6 +29,3 @@ class CacheEntryForPersistence(CacheEntry):
         self.embedding_dimension = embedding_dimension
         self.namespace = namespace
         self.hit_count = hit_count
-
-    def storage_type(self):
-        return "Persistent Storage"

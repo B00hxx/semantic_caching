@@ -10,7 +10,4 @@ class CacheEntry(ABC):
         self.answer = answer
         self.created_at = created_at or datetime.now(timezone.utc)
         self.ttl_seconds = ttl_seconds
-    @abstractmethod
-    def storage_type(self):
-        pass
     
