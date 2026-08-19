@@ -26,5 +26,8 @@ class VectorStore(ABC):
     async def ttl(self, identifier : str):
         """Method to get back the time to live of an entry"""
         pass
+    @abstractmethod
+    async def update_access_metadata(self, identifier : str):
+        pass
 
 

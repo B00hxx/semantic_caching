@@ -1,3 +1,7 @@
-from abc import ABC
+from abc import ABC, abstractmethod
+from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
 class CacheInvalidationStrategy(ABC):
-    pass
+    @abstractmethod
+    async def should_invalidate_entry(self, entry : CacheEntryForRetrieval):
+        pass
+

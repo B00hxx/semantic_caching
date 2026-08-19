@@ -7,6 +7,8 @@ from redis.commands.search.query import Query
 from .vector_store_services import VectorStore
 from .vector_search_result import VectorSearchResult
 from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from datetime import datetime, timezone
+
 class RedisService(VectorStore):
     def __init__(self, client: redis.Redis, dimension: int, prefix : str):
         self.client = client
@@ -53,20 +55,24 @@ class RedisService(VectorStore):
             print("INDEX CREATION LOG:", e)
 
     async def add_entry(self, entry: CacheEntryForRetrieval) -> str:
-        cache_id = f"{self.prefix}:{entry.id}" 
+        cache_id = f"{self.prefix}:{entry.id}"
         await self.client.hset(
-            cache_id,
-            mapping={
-                "question": entry.question,
-                "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
-                "answer": entry.answer,
-                "time": entry.created_at.isoformat(),
-                "ttl": entry.ttl_seconds,
-                "namespace" : entry.namespace
-            }
-        )
+        cache_id,
+        mapping={
+            "question": entry.question,
+            "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
+            "answer": entry.answer,
+            "created_at": entry.created_at.isoformat(),
+            "ttl": entry.ttl_seconds,
+            "namespace": entry.namespace,
+            "hit_count": entry.hit_count,
+            "last_hit_at": (entry.last_hit_at.isoformat() if entry.last_hit_at else ""),
+            "last_accessed_at": (entry.last_accessed_at.isoformat() if entry.last_accessed_at else ""),
+        }
+    )
         await self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
+    
     
     async def get_entry(self, identifier: str):
         return await self.client.hgetall(identifier)
@@ -92,7 +98,7 @@ class RedisService(VectorStore):
                 "(@namespace:{$ns})=>[KNN 1 @embedding $vec AS score]"
             )
             .sort_by("score")
-            .return_fields("question", "answer", "score", "time", "namespace")
+            .return_fields("question", "answer", "score", "created_at", "namespace")
             .dialect(2)
         )
         results = await self.client.ft(f"{self.prefix}_index").search(
@@ -114,7 +120,7 @@ class RedisService(VectorStore):
                 question=result.question,
                 score= 1 - score,
                 identifier = result.id,
-                time = result.time,
+                created_at = result.created_at,
                 ttl = await self.ttl(result.id),
                 namespace= result.namespace
             )
@@ -123,3 +129,17 @@ class RedisService(VectorStore):
 
     async def ttl(self, identifier: str):
         return await self.client.ttl(identifier)
+    
+    
+    async def update_access_metadata(self, identifier: str):
+        now = datetime.now(timezone.utc).isoformat()
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hincrby(identifier, "hit_count", 1)
+            pipe.hset(
+                identifier,
+                mapping={
+                    "last_hit_at": now,
+                    "last_accessed_at": now,
+                    }
+                )
+            await pipe.execute()
