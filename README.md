@@ -1,8 +1,8 @@
-# Semantic Caching & PII Redaction Middleware
+# Semantic Caching, PostgreSQL Persistence & PII Redaction Middleware
 
-A high-performance, privacy-focused **Semantic Caching & Data Anonymization Middleware** designed for Large Language Model (LLM) applications.
+A high-performance, privacy-focused **Semantic Caching, PostgreSQL Persistence & Data Anonymization Middleware** designed for Large Language Model (LLM) applications.
 
-This repository provides an end-to-end asynchronous pipeline that combines **Vector Similarity Search (Redis HNSW)**, **Privacy Protection / PII Redaction (Microsoft Presidio)**, **Local LLM & Embedding Services (Ollama)**, **JWT Authentication & Access Control**, and a **Classification & Performance Benchmarking Framework**.
+This repository provides an end-to-end asynchronous pipeline that combines **Vector Similarity Search (Redis HNSW)**, **Persistent Storage & Vector Recovery (PostgreSQL with `pgvector`)**, **Unified Model Routing & Proxying (LiteLLM Gateway)**, **Privacy Protection / PII Redaction (Microsoft Presidio)**, **Local LLM & Embedding Services (Ollama)**, **JWT Authentication & Access Control**, and a **Classification & Performance Benchmarking Framework**.
 
 ---
 
@@ -14,6 +14,7 @@ This repository provides an end-to-end asynchronous pipeline that combines **Vec
 - [Repository Structure](#-repository-structure)
 - [Prerequisites](#-prerequisites)
 - [Quick Start & Setup](#-quick-start--setup)
+- [Services & Docker Stack](#-services--docker-stack)
 - [Configuration & Environment Variables](#-configuration--environment-variables)
 - [API Endpoints](#-api-endpoints)
 - [Custom PII Redaction Rules](#-custom-pii-redaction-rules)
@@ -31,8 +32,10 @@ This middleware solves these problems by:
 1. **Redacting Sensitive PII Data** before queries reach the LLM or cache storage using Presidio Analyzer/Anonymizer microservices with runtime rule reloading.
 2. **Embedding & Searching Queries** against a Redis Vector Store using cosine distance calculation (HNSW index).
 3. **Serving Instant Cache Hits** when semantically similar queries are detected above a configurable similarity threshold.
-4. **Delegating Cache Misses** to an LLM provider (e.g., Ollama), then caching the resulting response for future matching.
-5. **Securing Administrative Actions** via OAuth2 JWT Bearer authentication.
+4. **Persisting Cache Entries in PostgreSQL (`pgvector`)** to record hit counts, access timestamps, and recover top-K hit cache entries upon application startup.
+5. **Routing & Managing Models via LiteLLM Gateway**, unifying LLM completion and embedding service interfaces.
+6. **Delegating Cache Misses** to an LLM provider via LiteLLM or Ollama, then caching the resulting response for future matching.
+7. **Securing Administrative Actions** via OAuth2 JWT Bearer authentication.
 
 ---
 
@@ -46,36 +49,45 @@ This middleware solves these problems by:
                                     ▼
                        ┌─────────────────────────┐
                        │   FastAPI Web Server    │
-                       │   (JWT Auth & Routers)  │
+                       │ (JWT Auth & Lifecycle)  │
                        └────────────┬────────────┘
                                     │
-                                    ▼
+                         PII Check  ▼  (Presidio Analyzer)
                        ┌─────────────────────────┐
                        │     QueryProcessor      │
-                       │ (Presidio PII Redact &  │
-                       │ Dynamic Rule Reloading) │
                        └────────────┬────────────┘
                                     │
-                                    ▼
-                       ┌─────────────────────────┐
-                       │ Ollama Embedding Service│
-                       └────────────┬────────────┘
-                                    │
-                                    ▼
-                       ┌─────────────────────────┐
-                       │ Redis Vector Store HNSW │
-                       └──────┬───────────┬──────┘
-                              │           │
-                   Cache Hit  │           │ Cache Miss
-                              ▼           ▼
-                      ┌──────────┐     ┌─────────────────────┐
-                      │ Return   │     │ Ollama LLM Service  │
-                      │ Cached   │     └──────────┬──────────┘
-                      │ Response │                │
-                      └──────────┘                ▼
-                                       ┌─────────────────────┐
-                                       │ Store in Redis Cache│
-                                       └─────────────────────┘
+                ┌───────────────────┴───────────────────┐
+                │                                       │
+      PII Found │                                       │ Clean Query
+                ▼                                       ▼
+    ┌──────────────────────┐                ┌───────────────────────┐
+    │  Direct LLM Request  │                │ LiteLLM Embedder      │
+    │  (Cache Bypassed)    │                └───────────┬───────────┘
+    └──────────────────────┘                            │
+                                                        ▼
+                                            ┌───────────────────────┐
+                                            │ Redis HNSW Vector     │
+                                            │ Search (FLOAT32)      │
+                                            └───────┬───────┬───────┘
+                                                    │       │
+                                         Cache Hit  │       │ Cache Miss
+                                                    ▼       ▼
+                                            ┌──────────┐ ┌─────────────────────────┐
+                                            │ Return   │ │ LiteLLM / Ollama        │
+                                            │ Cached   │ │ LLM Service             │
+                                            │ Response │ └────────────┬────────────┘
+                                            └────┬─────┘              │
+                                                 │                    ▼
+                                                 │         ┌──────────────────────────┐
+                                                 │         │ Store in Redis Cache &   │
+                                                 │         │ Persist to PostgreSQL    │
+                                                 │         └──────────────────────────┘
+                                                 ▼
+                                     ┌─────────────────────────┐
+                                     │ Update Hit Metrics in   │
+                                     │ PostgreSQL (pgvector)   │
+                                     └─────────────────────────┘
 ```
 
 ---
@@ -83,13 +95,16 @@ This middleware solves these problems by:
 ## ✨ Features
 
 - **🚀 Async Semantic Caching**: Powered by Redis Stack with HNSW vector index (`FLOAT32`, Cosine distance metric).
-- **🔒 Automated PII Redaction**: Integrates Presidio Analyzer and Anonymizer to replace sensitive entities with `<REDACTED>`.
-- **🔄 Dynamic Presidio Rule Reloading**: Dynamically uploads custom YAML rules and hot-reloads the Presidio Analyzer service in real time without restarting containers.
+- **🐘 Persistent Database Layer (`pgvector`)**: Stores cache entries in PostgreSQL for durability across restarts, tracking metrics (`hit_count`, `last_hit_at`, `last_accessed_at`), and pre-warming top-K hit entries into Redis during application startup.
+- **🌐 LiteLLM Gateway Routing**: Unified proxy layer for LLM inference and embeddings with configurable model definitions ([`config.yaml`](file:///home/baha/Documents/internship/config.yaml)).
+- **🔒 Automated PII Redaction**: Integrates Presidio Analyzer and Anonymizer to identify sensitive entities and bypass/redact sensitive data.
+- **🔄 Dynamic Presidio Rule Reloading**: Uploads custom YAML rules and hot-reloads the Presidio Analyzer service in real time without restarting containers.
 - **🔐 JWT Authentication & Security**: Secures administrative API endpoints (such as cache deletion) using OAuth2 JWT Bearer tokens.
-- **🦙 Ollama Integration**: Out-of-the-box support for asynchronous local LLM inference (`qwen2.5:0.5b`) and vector embeddings (`qwen3-embedding:0.6b`).
-- **📊 Cache Analytics & Management**: Endpoints for inspecting cache memory usage, key counts, and clearing the database.
-- **⚡ Classification Benchmarking Suite**: Evaluates cache duplicate detection performance on datasets (e.g., Quora Question Pairs) and outputs classification metrics including Confusion Matrix (TP, FP, TN, FN), Accuracy, Precision, Recall, and F1 Score.
-- **🧪 Comprehensive Test Coverage**: Unit tests with mock components (`FakeLLM`, `FakeEmbedder`, `FakeRedisService`) and real integration tests.
+- **🦙 Ollama Integration**: Local LLM (`qwen2.5:0.5b`) and vector embedding (`qwen3-embedding:0.6b`) support.
+- **📊 Cache Analytics & Management**: Endpoints for inspecting Redis memory usage, key counts, and PostgreSQL top-K entries.
+- **🛠️ Integrated Developer Tools**: Includes **RedisInsight** (Redis GUI) and **PgAdmin4** (PostgreSQL GUI) in the Docker Compose stack.
+- **⚡ Classification Benchmarking Suite**: Evaluates cache duplicate detection performance on datasets (e.g., Quora Question Pairs) and outputs metrics including Confusion Matrix (TP, FP, TN, FN), Accuracy, Precision, Recall, and F1 Score.
+- **🧪 Comprehensive Test Coverage**: Unit tests with mock components (`FakeLLM`, `FakeEmbedder`, `FakeRedisService`) and full integration tests.
 
 ---
 
@@ -99,17 +114,18 @@ This middleware solves these problems by:
 .
 ├── API/                          # FastAPI web application layer
 │   ├── app.py                    # Main FastAPI app initialization & router composition
-│   ├── lifespan.py               # Async startup/shutdown initialization & cleanup
+│   ├── lifespan.py               # Async startup/shutdown initialization & DB pre-warming
 │   ├── auth/                     # JWT authentication & security utilities
 │   │   └── security.py           # Password hashing, JWT token generation & verification
 │   ├── routes/                   # Modular APIRouters
 │   │   ├── auth.py               # Authentication endpoint (/auth/login)
-│   │   ├── chat.py               # Query processing endpoints (/chat/ask, /chat/fake_ask)
+│   │   ├── chat.py               # Query processing endpoints (/chat/lite_llm, /chat/fake_ask)
 │   │   ├── delete.py             # Protected cache deletion routes (/delete/cache, /delete/fake_cache)
 │   │   ├── redaction_rules.py    # Dynamic Presidio rules upload (/rules/upload-redaction-rules)
-│   │   └── stats.py              # Cache statistics route (/stats/stats)
+│   │   ├── stats.py              # Redis cache statistics route (/stats/stats)
+│   │   └── top_k_entries.py      # PostgreSQL top-K entries route (/stats/postgres_entries)
 │   └── schemas/                  # Pydantic request/response validation models
-│       └── query_request.py      # QueryRequest schema
+│       └── query_request.py      # QueryRequest & NumberOfEntries schemas
 ├── benchmark/                    # Load testing and performance benchmarking framework
 │   ├── main.py                   # Main benchmark entrypoint script
 │   ├── clients/                  # API clients (AuthClient, CacheClient)
@@ -119,29 +135,42 @@ This middleware solves these problems by:
 │   ├── runners/                  # Benchmark execution runners (SequentialBenchmarkRunner)
 │   └── workers/                  # Worker execution engine (Worker)
 ├── custom_recognizers/           # Custom Presidio YAML recognizer rules directory
-│   └── gemini-code-1785749213179.yaml
+├── litellm/                      # LiteLLM proxy configuration directory
+│   └── config.yaml               # LiteLLM model routing definitions & master settings
+├── ollama/                       # Local Ollama model storage & configuration
+├── postgres/                     # PostgreSQL database initialization & schemas
+│   ├── init-cache-db.sh          # Database creation script for cache persistence
+│   └── schema.sql                # SQL schema definition with pgvector extension
 ├── semantic_caching/             # Core semantic caching & privacy modules
 │   ├── semantic_caching.py       # Main SemanticCaching orchestration engine
 │   ├── query.py                  # QueryProcessor client for Presidio microservices
-│   ├── cache_entry.py            # Cache entry data structure
-│   ├── timing.py                 # Execution time measurement utilities
-│   ├── embedding_services/       # Abstract and concrete embedder classes (Ollama)
-│   ├── llm_services/             # Abstract and concrete LLM classes (Ollama, FakeLLM)
-│   ├── presidio-analyzer/        # Custom Presidio Analyzer microservice container
+│   ├── cache_entry/              # Cache entry data structures
+│   │   ├── cache_entry.py        # Base cache entry schema
+│   │   ├── cache_entry_persistent.py # PostgreSQL persistent entry schema
+│   │   └── cache_entry_retrieval.py  # Redis retrieval entry schema
+│   ├── cache_invalidation/       # Cache invalidation strategies
+│   ├── embedding_services/       # Abstract and concrete embedder classes (LiteLLM, Ollama)
+│   ├── llm_services/             # Abstract and concrete LLM classes (LiteLLM, FakeLLM)
+│   ├── postgres_service/         # Asyncpg PostgreSQL service layer for pgvector
+│   │   └── postgres_service.py   # Connection pooling, persistence, and hit count updates
+│   ├── presidio_analyzer/        # Custom Presidio Analyzer microservice container
 │   │   ├── Dockerfile
 │   │   ├── prisidio_reload_service.py # Dynamic rule reload client service
 │   │   └── server.py             # Presidio analyzer API with dynamic YAML rule loader
 │   └── vector_store_services/    # Abstract and concrete vector store classes (Redis)
+│       ├── redis_service.py      # Async Redis HNSW vector store service
+│       └── vector_search_result.py # Search result wrapper
 ├── testing/                      # Test suite
 │   ├── fake_components/          # Mocks for unit testing (FakeLLM, FakeEmbedder, FakeRedis)
 │   ├── unit_tests/               # Pytest unit tests for pipeline & threshold logic
-│   └── integration_testing/      # End-to-end integration tests against real services
+│   └── integration_testing/      # End-to-end integration tests against live services
 ├── utils/                        # Utility helper functions
 │   └── cosine_similarity.py      # NumPy cosine similarity calculation helper
 ├── visualizations/               # Benchmark visualization scripts & generated charts
 │   ├── visualize_results.py      # Plot generation script for performance metrics
 │   └── results.json              # Evaluated threshold benchmark results
 ├── config.py                     # Centralized settings & Pydantic env config
+├── config.yaml                   # Root LiteLLM config mapping
 ├── Dockerfile                    # Container definition for FastAPI app
 ├── docker-compose.yml            # Multi-service stack composition
 ├── pytest.ini                    # Pytest configuration
@@ -152,10 +181,11 @@ This middleware solves these problems by:
 
 ## ⚙️ Prerequisites
 
-- **Docker** & **Docker Compose** (recommended for quick setup)
-- **Python 3.12+** (if running locally without Docker)
+- **Docker** & **Docker Compose** (recommended for full stack deployment)
+- **Python 3.12+** (if running application modules locally)
 - **Redis Stack Server** (with RediSearch enabled)
-- **Ollama** installed and running with models pulled (`qwen2.5:0.5b` and `qwen3-embedding:0.6b` or configured equivalents)
+- **PostgreSQL 17** (with `pgvector` extension)
+- **Ollama** running locally with models pulled (`qwen2.5:0.5b` and `qwen3-embedding:0.6b` or configured equivalents)
 
 ---
 
@@ -163,18 +193,22 @@ This middleware solves these problems by:
 
 ### 1. Using Docker Compose (Recommended)
 
-Start the full stack including Redis, RedisInsight, Ollama, Presidio Analyzer, Presidio Anonymizer, and FastAPI:
+Start the full containerized multi-service stack:
 
 ```bash
 docker-compose up --build -d
 ```
 
-The services will be available at:
-- **FastAPI Application**: `http://localhost:8000`
-- **RedisInsight (GUI)**: `http://localhost:5540`
+The stack launches all 9 integrated services:
+- **FastAPI Middleware**: `http://localhost:8000`
+- **LiteLLM Gateway**: `http://localhost:4000`
+- **PgAdmin (PostgreSQL GUI)**: `http://localhost:5050`
+- **RedisInsight (Redis GUI)**: `http://localhost:5540`
 - **Presidio Analyzer**: `http://localhost:5002`
 - **Presidio Anonymizer**: `http://localhost:5001`
 - **Ollama API**: `http://localhost:11434`
+- **Redis Vector Database**: Port `6380` (mapped to internal `6379`)
+- **PostgreSQL Database**: Port `5432`
 
 ### 2. Manual Local Setup
 
@@ -189,7 +223,8 @@ The services will be available at:
    pip install -r requirements.txt
    ```
 
-3. **Start local services** (Redis Stack, Ollama, Presidio microservices).
+3. **Configure Environment Variables**:
+   Create a `.env` file in the root directory (see [Configuration section](#-configuration--environment-variables)).
 
 4. **Launch the FastAPI application**:
    ```bash
@@ -198,23 +233,49 @@ The services will be available at:
 
 ---
 
+## 🐳 Services & Docker Stack
+
+| Service Container | Internal Port | Host Port | Description |
+| :--- | :--- | :--- | :--- |
+| `fastapi` | `8000` | `8000` | FastAPI Web Application & Core Middleware Pipeline |
+| `litellm` | `4000` | `4000` | LiteLLM Proxy Gateway for model completions and embeddings |
+| `postgres` | `5432` | internal | PostgreSQL 17 with `pgvector` for cache persistence |
+| `pgadmin` | `80` | `5050` | Web-based management GUI for PostgreSQL |
+| `redis` | `6379` | `6380` | Redis Stack vector database with HNSW search index |
+| `redisinsight` | `5540` | `5540` | Web-based GUI for Redis data inspection |
+| `ollama` | `11434` | `11434` | Ollama local model inference server |
+| `presidio-analyzer` | `3000` | `5002` | Custom Presidio Analyzer with dynamic rule reloading API |
+| `presidio-anonymizer` | `3000` | `5001` | Presidio Anonymizer microservice |
+
+---
+
 ## 🛠️ Configuration & Environment Variables
 
-System configuration is defined in [`config.py`](file:///home/baha/Documents/internship/config.py) and can be overridden via environment variables or a `.env` file:
+System settings are managed in [`config.py`](file:///home/baha/Documents/internship/config.py) and configured via environment variables or a `.env` file:
 
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `REDIS_HOST` | `localhost` | Hostname of the Redis Stack server |
-| `REDIS_PORT` | `6379` | Port of the Redis Stack server |
-| `OLLAMA_HOST` | `http://localhost:11434` | Endpoint of the Ollama server |
+| `REDIS_HOST` | `localhost` | Hostname of the Redis server |
+| `REDIS_PORT` | `6379` | Port of the Redis server |
+| `OLLAMA_HOST` | `http://localhost:11434` | Endpoint URL of the Ollama service |
 | `ANALYZER_URL` | `http://localhost:5002/analyze` | Presidio Analyzer endpoint |
 | `ANONYMIZER_URL` | `http://localhost:5001/anonymize` | Presidio Anonymizer endpoint |
 | `CUSTOM_RULES_DIR` | `./custom_recognizers` | Directory containing custom Presidio YAML rules |
-| `DELETE_ON_SHUTDOWN` | `true` | If `true`, flushes the Redis vector cache on app shutdown |
-| `JWT_SECRET_KEY` | *(Required)* | Secret key used for signing JWT access tokens |
-| `ADMIN_USERNAME` | *(Required)* | Administrative username for API authentication |
+| `CACHE_POSTGRES_HOST` | `postgres` | Hostname of the PostgreSQL database |
+| `CACHE_POSTGRES_PORT` | `5432` | Port of the PostgreSQL database |
+| `CACHE_POSTGRES_DB` | *(Required)* | Database name for cache persistence |
+| `CACHE_POSTGRES_USER` | *(Required)* | Database user for cache persistence |
+| `CACHE_POSTGRES_PASSWORD` | *(Required)* | Database password for cache persistence |
+| `MODEL_NAME` | *(Configured)* | LiteLLM model identifier for chat completions |
+| `API_KEY` | *(Configured)* | API Key for LiteLLM completion service |
+| `EMBEDDING_MODEL_NAME` | *(Configured)* | LiteLLM model identifier for embeddings |
+| `API_KEY_EMB` | *(Configured)* | API Key for LiteLLM embedding service |
+| `EMBEDDING_MODEL_DIMENSION` | `1024` | Vector dimension size of embeddings |
+| `DELETE_ON_SHUTDOWN` | `true` | Flushes Redis vector cache on FastAPI application shutdown |
+| `JWT_SECRET_KEY` | *(Required)* | Secret key for signing JWT tokens |
+| `ADMIN_USERNAME` | *(Required)* | Administrative username for API access |
 | `ADMIN_PASSWORD_HASH` | *(Required)* | Hashed password for admin authentication |
-| `ADMIN_PASSWORD` | *(Required)* | Admin password used during login authentication |
+| `ADMIN_PASSWORD` | *(Required)* | Plaintext admin password (used for login and tests) |
 
 ---
 
@@ -222,7 +283,7 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
 
 ### 1. Authentication (Login)
 - **URL**: `POST /auth/login`
-- **Body** (Form-Data):
+- **Body** (`application/x-www-form-urlencoded`):
   - `username`: Admin username
   - `password`: Admin password
 - **Response**:
@@ -233,25 +294,36 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 2. Ask Question (Main Pipeline)
-- **URL**: `POST /chat/ask`
+### 2. Ask Question (LiteLLM & Redis/PostgreSQL Pipeline)
+- **URL**: `POST /chat/lite_llm`
 - **Body**:
   ```json
   {
     "query": "What is machine learning?"
   }
   ```
-- **Response**:
+- **Response (Cache Miss)**:
   ```json
   {
     "cache_hit": false,
     "cosine_distance": null,
-    "answer": "Machine learning is a subset of artificial intelligence...",
-    "time": "2026-08-04T12:00:00.000000"
+    "answer": "Machine learning is a branch of artificial intelligence...",
+    "time": "2026-08-20T16:00:00.000000"
+  }
+  ```
+- **Response (Cache Hit)**:
+  ```json
+  {
+    "cache_hit": true,
+    "cosine_distance": 0.0342,
+    "answer": "Machine learning is a branch of artificial intelligence...",
+    "time": "2026-08-20T16:00:00.000000",
+    "id": "lite:550e8400-e29b-41d4-a716-446655440000",
+    "ttl": 86400
   }
   ```
 
-### 3. Fast/Fake Ask (Benchmarking Mock LLM)
+### 3. Fast / Fake Ask (Benchmarking Endpoint)
 - **URL**: `POST /chat/fake_ask`
 - **Body**:
   ```json
@@ -260,7 +332,7 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 4. Cache Statistics
+### 4. Cache Statistics (Redis)
 - **URL**: `GET /stats/stats`
 - **Response**:
   ```json
@@ -270,7 +342,28 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 5. Clear Cache (Protected)
+### 5. PostgreSQL Top-K Cache Entries
+- **URL**: `POST /stats/postgres_entries`
+- **Body**:
+  ```json
+  {
+    "k": 5
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "entries": [
+      {
+        "question": "What is machine learning?",
+        "hit_count": 14,
+        "embedding_dimension": 1024
+      }
+    ]
+  }
+  ```
+
+### 6. Clear Redis Cache (Protected)
 - **URL**: `DELETE /delete/cache`
 - **Headers**: `Authorization: Bearer <JWT_TOKEN>`
 - **Response**:
@@ -280,7 +373,7 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 6. Clear Fake Cache (Protected)
+### 7. Clear Fake Cache (Protected)
 - **URL**: `DELETE /delete/fake_cache`
 - **Headers**: `Authorization: Bearer <JWT_TOKEN>`
 - **Response**:
@@ -290,7 +383,7 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
   }
   ```
 
-### 7. Upload Custom Redaction Rules
+### 8. Upload Custom Redaction Rules
 - **URL**: `POST /rules/upload-redaction-rules`
 - **Form Data**: `file` (`.yaml` / `.yml`)
 - **Note**: Uploading a valid YAML rule file automatically triggers a real-time hot reload of the Presidio Analyzer recognizer registry.
@@ -299,9 +392,9 @@ System configuration is defined in [`config.py`](file:///home/baha/Documents/int
 
 ## 🛡️ Custom PII Redaction Rules
 
-Custom YAML rules can be placed in `custom_recognizers/` or uploaded via the `/rules/upload-redaction-rules` endpoint.
+Custom YAML rules can be placed in `custom_recognizers/` or uploaded via `/rules/upload-redaction-rules`.
 
-Example YAML structure:
+Example YAML rule structure:
 ```yaml
 recognizers:
   - name: "EmployeeIDRecognizer"
@@ -325,7 +418,7 @@ Run the classification benchmarking framework against live or mock endpoints:
 python -m benchmark.main
 ```
 
-The runner logs in to obtain a JWT token, passes questions from the Quora dataset (`benchmark/datasets/train.csv`), and evaluates the cache classification quality:
+The runner authenticates via JWT, iterates through question pairs from the Quora dataset (`benchmark/datasets/train.csv`), and calculates performance metrics:
 
 ```text
 ===== Benchmark Results =====
@@ -341,31 +434,31 @@ f1_score: 0.9278
 
 ### 📈 Performance & Threshold Visualizations
 
-To analyze performance across various similarity thresholds, run the visualization script:
+To analyze performance metrics across similarity threshold settings, execute:
 
 ```bash
 python visualizations/visualize_results.py
 ```
 
-This generates comprehensive analysis plots based on the evaluated benchmark dataset:
+This generates visual charts saved in the project root:
 
 #### 1. Performance Metrics vs. Similarity Threshold
-Shows how **Accuracy**, **Precision**, **Recall**, and **F1 Score** evolve across similarity thresholds (ranging from 0.50 to 0.95). As the similarity threshold increases, precision improves while recall decreases.
+Tracks **Accuracy**, **Precision**, **Recall**, and **F1 Score** across threshold values (0.50 to 0.95).
 
 ![Performance vs Threshold](performance_vs_threshold.png)
 
 #### 2. F1 Score Optimization
-Highlights the F1 Score curve across similarity thresholds, pinpointing the optimal threshold value that balances precision and recall.
+Highlights the F1 Score curve across similarity thresholds to pinpoint optimal threshold balance.
 
 ![F1 Score vs Threshold](f1_vs_threshold.png)
 
 #### 3. Precision–Recall Tradeoff
-Displays the trade-off curve between Precision and Recall with annotations for each evaluated similarity threshold.
+Shows the trade-off curve between Precision and Recall for evaluated thresholds.
 
 ![Precision-Recall Tradeoff](precision_recall_tradeoff.png)
 
 #### 4. Confusion Matrix Breakdown
-Tracks the exact counts of **True Positives (TP)**, **False Positives (FP)**, **True Negatives (TN)**, and **False Negatives (FN)** across different threshold values.
+Displays counts of **True Positives (TP)**, **False Positives (FP)**, **True Negatives (TN)**, and **False Negatives (FN)** per threshold value.
 
 ![Confusion Matrix Breakdown](confusion_matrix_vs_threshold.png)
 
@@ -374,14 +467,14 @@ Tracks the exact counts of **True Positives (TP)**, **False Positives (FP)**, **
 ## 🧪 Testing
 
 ### Unit Tests
-Run fast unit tests with mock LLM and vector store components:
+Run unit tests with mock LLM and vector store components:
 
 ```bash
 pytest testing/unit_tests/
 ```
 
 ### Integration Tests
-Run end-to-end integration tests against live Ollama and Redis services:
+Run integration tests against live Ollama, Redis, and PostgreSQL services:
 
 ```bash
 pytest testing/integration_testing/
@@ -392,4 +485,3 @@ pytest testing/integration_testing/
 ## 📄 License
 
 This project is open-source and available under the standard MIT License.
-
