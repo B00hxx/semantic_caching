@@ -29,5 +29,7 @@ class VectorStore(ABC):
     @abstractmethod
     async def update_access_metadata(self, identifier : str):
         pass
-
+    @abstractmethod
+    async def get_all_entries(self):
+        pass
 

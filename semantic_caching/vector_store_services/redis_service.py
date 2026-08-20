@@ -127,6 +127,7 @@ class RedisService(VectorStore):
             return vector_search_result
         return None
 
+    
     async def ttl(self, identifier: str):
         return await self.client.ttl(identifier)
     
@@ -143,3 +144,6 @@ class RedisService(VectorStore):
                     }
                 )
             await pipe.execute()
+    
+    async def get_all_entries(self):
+        pass
