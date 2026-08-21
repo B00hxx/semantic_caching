@@ -46,7 +46,6 @@ class RedisService(VectorStore):
             index_type=IndexType.HASH
         )
         try:
-            # Awaited async index creation
             await self.client.ft(f"{self.prefix}_index").create_index(
                 schema,
                 definition=definition
@@ -63,19 +62,19 @@ class RedisService(VectorStore):
             "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
             "answer": entry.answer,
             "created_at": entry.created_at.isoformat(),
-            "ttl": entry.ttl_seconds,
             "namespace": entry.namespace,
             "hit_count": entry.hit_count,
             "last_hit_at": (entry.last_hit_at.isoformat() if entry.last_hit_at else ""),
             "last_accessed_at": (entry.last_accessed_at.isoformat() if entry.last_accessed_at else ""),
         }
     )
-        await self.client.expire(cache_id, entry.ttl_seconds)
+        #await self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
     
     
-    async def get_entry(self, identifier: str):
-        return await self.client.hgetall(identifier)
+    async def get_entry(self, identifier: uuid.UUID):
+        cache_id = f"{self.prefix}:{identifier}"
+        return await self.client.hgetall(cache_id)
     
     async def get_size(self) -> int:
         count = 0
@@ -121,15 +120,10 @@ class RedisService(VectorStore):
                 score= 1 - score,
                 identifier = result.id,
                 created_at = result.created_at,
-                ttl = await self.ttl(result.id),
                 namespace= result.namespace
             )
             return vector_search_result
         return None
-
-    
-    async def ttl(self, identifier: str):
-        return await self.client.ttl(identifier)
     
     
     async def update_access_metadata(self, identifier: str):
@@ -146,7 +140,8 @@ class RedisService(VectorStore):
             await pipe.execute()
     
     async def delete_entry(self, identifier: uuid.UUID):
-        return await self.client.delete(identifier)
+        cache_id = f"{self.prefix}:{identifier}"
+        return await self.client.delete(cache_id)
     
     async def get_all_entries(self) -> list[CacheEntryForRetrieval]:
         entries = []
@@ -162,7 +157,6 @@ class RedisService(VectorStore):
                     dtype=np.float32
                 ).tolist(),
                 answer=data[b"answer"].decode(),
-                ttl_seconds=int(data[b"ttl"]),
                 created_at=datetime.fromisoformat(
                     data[b"created_at"].decode()
                 ),

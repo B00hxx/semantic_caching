@@ -1,4 +1,6 @@
 import os
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from config import settings
@@ -9,7 +11,25 @@ from semantic_caching.query import QueryProcessor
 from semantic_caching.llm_services.lite_llm_service import LiteLLMService
 from semantic_caching.embedding_services.litellm_embedding_service import LiteLLMEmbedder
 from semantic_caching.postgres_service.postgres_service import PostgresService
+from semantic_caching.cache_invalidation.ttl_invalidation_strategy import TTLInvalidationStrategy
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
+
+async def invalidation_loop(cache, interval_seconds: int):
+    while True:
+        try:
+            invalidated = await cache.invalidate_entries()
+
+            logger.info(
+                "Cache invalidation completed: %d entries invalidated",
+                invalidated
+            )
+
+        except Exception:
+            logger.exception("Cache invalidation failed")
+
+        await asyncio.sleep(interval_seconds)
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
@@ -19,6 +39,9 @@ async def lifespan(app : FastAPI):
     query_processor = QueryProcessor()
     postgres_service = await settings.postgres_service.get_service()
 
+    await testing_fake_redis.initialize()
+    await lite_redis.initialize()
+    
     #LLMs
     lite_llm_service = LiteLLMService(
         api_key= settings.lite_llm_settings.api_key,
@@ -30,42 +53,30 @@ async def lifespan(app : FastAPI):
     
 
     #embedding services
-    litellm_embedding_service = LiteLLMEmbedder(
-        api_key = settings.lite_llm_settings.embedding_model_key,
-        model_name = settings.lite_llm_settings.embedding_model_name,
-        link="http://litellm:4000",
-        embedding_dimension=settings.lite_llm_settings.embedding_model_dimension
-    )
+    litellm_embedding_service = LiteLLMEmbedder(api_key = settings.lite_llm_settings.embedding_model_key, model_name = settings.lite_llm_settings.embedding_model_name, link="http://litellm:4000", embedding_dimension=settings.lite_llm_settings.embedding_model_dimension)
     
     
-    await testing_fake_redis.initialize()
-    await lite_redis.initialize()
+    #cache invalidation
+    ttl_invalidation_strategy = TTLInvalidationStrategy(ttl_seconds=60)
     
+    #Cache
+    fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=litellm_embedding_service, vector_store=testing_fake_redis, threshold=0.95, query_processor=query_processor, namespace="fake_test")
+    ttl_cache = SemanticCaching(llm_model=lite_llm_service, embedding_model=litellm_embedding_service, vector_store=lite_redis, query_processor=query_processor, threshold=0.8, postgres=postgres_service, invalidation_strategy=ttl_invalidation_strategy)
     
-
-    fake_testing = SemanticCaching(llm_model=fake_llm, 
-                                   embedding_model=litellm_embedding_service, 
-                                   vector_store=testing_fake_redis, 
-                                   threshold=0.95, 
-                                   query_processor=query_processor,
-                                   namespace="fake_test",
-                                   )
-    lite_testing = SemanticCaching(llm_model=lite_llm_service, 
-                                   embedding_model=litellm_embedding_service, 
-                                   vector_store=lite_redis, 
-                                   query_processor=query_processor, 
-                                   threshold=0.8,
-                                   postgres=postgres_service)
-    
-    await lite_testing.initialize(limit=10)
+    await ttl_cache.initialize(limit=10)
     
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
-    app.state.lite_testing = lite_testing
+    app.state.ttl_cache = ttl_cache
     app.state.postgres_service = postgres_service
 
-    print("Started the pipeline with success!")
-    
+
+    invalidation_task = asyncio.create_task(
+        invalidation_loop(
+            app.state.ttl_cache,
+            interval_seconds=settings.cache_invalidation_interval
+        )
+    )    
     yield
     load_dotenv()
     try:
@@ -86,3 +97,9 @@ async def lifespan(app : FastAPI):
             await postgres_service.close()
         except Exception as exc:
             print(f"PostgreSQL close skipped: {exc}")
+        
+        invalidation_task.cancel()
+        try:
+            await invalidation_task
+        except asyncio.CancelledError:
+            pass

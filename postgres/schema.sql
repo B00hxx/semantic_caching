@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS cache_entries (
     answer TEXT NOT NULL,
     namespace TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
-    ttl_seconds INTEGER NOT NULL,
     hit_count INTEGER NOT NULL DEFAULT 0,
     last_hit_at TIMESTAMPTZ,
     last_accessed_at TIMESTAMPTZ

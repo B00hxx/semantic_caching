@@ -13,7 +13,6 @@ class CacheEntryForPersistence(CacheEntry):
         answer: str,
         namespace: str,
         hit_count: int = 0,
-        ttl_seconds: int = 3600,
         id: UUID | None = None,
         created_at: datetime | None = None,
         last_hit_at: datetime | None = None,
@@ -23,7 +22,6 @@ class CacheEntryForPersistence(CacheEntry):
             question=question,
             embedding=embedding,
             answer=answer,
-            ttl_seconds=ttl_seconds,
             id=id,
             created_at=created_at,
         )
