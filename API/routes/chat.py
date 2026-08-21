@@ -13,3 +13,13 @@ async def fake_ask_question(query_request : QueryRequest, request : Request):
 async def ask_lite_llm(query_request : QueryRequest, request : Request):
     result = await request.app.state.ttl_cache.get_answers(query=query_request.query)
     return result
+
+@router.post('/inactivity_cache')
+async def ask_lite_llm(query_request : QueryRequest, request : Request):
+    result = await request.app.state.inactivity_cache.get_answers(query=query_request.query)
+    return result
+
+@router.post('/hit_count_cache')
+async def ask_lite_llm(query_request : QueryRequest, request : Request):
+    result = await request.app.state.hit_count_cache.get_answers(query=query_request.query)
+    return result
