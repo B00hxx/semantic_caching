@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from .vector_search_result import VectorSearchResult
-
+from uuid import UUID
 class VectorStore(ABC):
     @abstractmethod
     async def add_entry(self, entry):
@@ -23,8 +23,12 @@ class VectorStore(ABC):
         """Searching through the vector db for closest match"""
         pass
     @abstractmethod
-    async def ttl(self, identifier : str):
-        """Method to get back the time to live of an entry"""
+    async def update_access_metadata(self, identifier : str):
         pass
-
-
+    @abstractmethod
+    async def get_all_entries(self):
+        pass
+    @abstractmethod
+    async def delete_entry(self, identifier: UUID):
+        """Delete an entry from the vector store."""
+        pass

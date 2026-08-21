@@ -5,25 +5,21 @@ from .cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
 from .vector_store_services.vector_store_services import VectorStore
 from .query import QueryProcessor
 from .postgres_service.postgres_service import PostgresService, CacheEntryForPersistence
+from .cache_invalidation.cache_invalidation_strategy import CacheInvalidationStrategy
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 class SemanticCaching:
-    def __init__(self, 
-                 llm_model: LLM, 
-                 embedding_model: Embedder, 
-                 vector_store: VectorStore, 
-                 query_processor : QueryProcessor = None, 
-                 threshold: float = 0.5, 
-                 namespace : str = "default",
-                 postgres : PostgresService | None = None):
+    def __init__(self, llm_model: LLM, embedding_model: Embedder, vector_store: VectorStore, invalidation_strategy : CacheInvalidationStrategy | None = None, query_processor : QueryProcessor = None, threshold: float = 0.5, namespace : str = "default", postgres : PostgresService | None = None):
+       
         self.llm = llm_model
         self.embedding = embedding_model
         self.threshold = threshold
         self.vector_store = vector_store
         self.query_processor = query_processor
         self.postgres = postgres
+        self.invalidation_strategy = invalidation_strategy
         
         if not namespace:
             raise ValueError("namespace cannot be empty")
@@ -36,17 +32,37 @@ class SemanticCaching:
                                           embedding_dimension=int(self.embedding.embedding_dimension), 
                                           namespace=self.namespace, 
                                           limit=limit)
-        top_entries_transformed = [CacheEntryForRetrieval(question=entry.question, 
-                                                              embedding=entry.embedding, 
-                                                              answer=entry.answer, 
-                                                              ttl_seconds=entry.ttl_seconds, 
-                                                              namespace=entry.namespace, 
-                                                              id=entry.id) 
-                                       for entry in top_entries]
+        top_entries_transformed = [CacheEntryForRetrieval(
+                                                        question=entry.question,
+                                                        embedding=entry.embedding,
+                                                        answer=entry.answer,
+                                                        namespace=entry.namespace,
+                                                        id=entry.id,
+                                                        created_at=entry.created_at,
+                                                        hit_count=entry.hit_count,
+                                                        last_hit_at=entry.last_hit_at,
+                                                        last_accessed_at=entry.last_accessed_at) for entry in top_entries]
         for entry in top_entries_transformed:
             await self.vector_store.add_entry(entry)
         logger.info("Loaded %d cache entries from PostgreSQL", len(top_entries))
         return len(top_entries)
+    
+    async def invalidate_entries(self) -> int:
+        if self.invalidation_strategy is None:
+            return 0
+        entries = await self.vector_store.get_all_entries()
+        invalidated_count = 0
+        for entry in entries:
+            should_invalidate = (await self.invalidation_strategy.should_invalidate_entry(entry))
+            if should_invalidate:
+                await self.vector_store.delete_entry(entry.id)
+                invalidated_count += 1
+                logger.info(
+                    "Invalidated cache entry %s",
+                    entry.id
+                )
+        return invalidated_count
+    
     async def get_answers(self, query:str)->dict:
         spans = []
         if self.query_processor is not None:
@@ -74,21 +90,22 @@ class SemanticCaching:
                 entry_retrieval = CacheEntryForRetrieval(question=query,
                                                embedding=embedded, 
                                                answer=answer_by_llm, 
-                                               namespace=self.namespace)
+                                               namespace=self.namespace,
+                                               hit_count=1)
                 logger.info("Entry being added to cache")
                 await self.vector_store.add_entry(entry_retrieval)
                 if self.postgres:
                     try: 
                         entry_persistent = CacheEntryForPersistence(
-                                question=query,
-                                embedding=embedded,
-                                answer=answer_by_llm,
-                                embedding_model=self.embedding.model_name,
-                                embedding_dimension = int(self.embedding.embedding_dimension),
-                                namespace=self.namespace,
-                                ttl_seconds=entry_retrieval.ttl_seconds,
-                                id=entry_retrieval.id,
-                            )
+                            question=query,
+                            embedding=embedded,
+                            answer=answer_by_llm,
+                            embedding_model=self.embedding.model_name,
+                            embedding_dimension=int(self.embedding.embedding_dimension),
+                            namespace=self.namespace,
+                            id=entry_retrieval.id,
+                            hit_count=entry_retrieval.hit_count,
+                        )
                         await self.postgres.save_entry(entry_persistent)
                     except Exception:
                         logger.exception("Failed to persist cache entry to PostgreSQL")
@@ -100,6 +117,7 @@ class SemanticCaching:
                 }
             else:
                 logger.info("Good match was found, retrieving from Store")
+                await self.vector_store.update_access_metadata(identifier = response_from_vector_store.identifier)
                 try:
                     id = response_from_vector_store.identifier.split(":", 1)[-1]
                     await self.postgres.update_hit_count(id = id)
@@ -110,24 +128,27 @@ class SemanticCaching:
                     "cache_hit" : True,
                     "cosine_distance" : response_from_vector_store.score,
                     "answer" : response_from_vector_store.answer,
-                    "time" : response_from_vector_store.time,
+                    "time" : response_from_vector_store.created_at,
                     "id" : response_from_vector_store.identifier,
-                    "ttl" : response_from_vector_store.ttl
                 }
         else:
             logger.info("PII discovered, send to LLM directly")
             answer_by_llm = await self.llm.generate(query=query)
             redacted_query = self.query_processor.redact(query = query, analyzer_results=spans)
-            entry_persistent = CacheEntryForPersistence(
+            if self.postgres:
+                try:
+                    entry_persistent = CacheEntryForPersistence(
                                             question=redacted_query,
                                             embedding=[0],
                                             answer=answer_by_llm,
                                             embedding_model= "None",
                                             embedding_dimension = 0,
                                             namespace="None",
-                                            ttl_seconds=0,
                                         )
-            await self.postgres.save_entry(entry_persistent)
+                    await self.postgres.save_entry(entry_persistent)
+                except Exception:
+                        logger.info("error in saving redacted stuff to postgres")
+
             return {
                 "cache_hit" : False,
                 "cache_bypassed" : True,

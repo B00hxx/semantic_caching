@@ -2,6 +2,7 @@ from .cache_entry import CacheEntry
 from uuid import UUID
 from datetime import datetime
 
+
 class CacheEntryForPersistence(CacheEntry):
     def __init__(
         self,
@@ -12,15 +13,15 @@ class CacheEntryForPersistence(CacheEntry):
         answer: str,
         namespace: str,
         hit_count: int = 0,
-        ttl_seconds: int = 3600,
         id: UUID | None = None,
         created_at: datetime | None = None,
+        last_hit_at: datetime | None = None,
+        last_accessed_at: datetime | None = None,
     ):
         super().__init__(
             question=question,
             embedding=embedding,
             answer=answer,
-            ttl_seconds=ttl_seconds,
             id=id,
             created_at=created_at,
         )
@@ -29,3 +30,5 @@ class CacheEntryForPersistence(CacheEntry):
         self.embedding_dimension = embedding_dimension
         self.namespace = namespace
         self.hit_count = hit_count
+        self.last_hit_at = last_hit_at
+        self.last_accessed_at = last_accessed_at

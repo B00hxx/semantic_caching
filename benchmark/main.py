@@ -28,7 +28,7 @@ async def main():
     )
 
     pairs = loader.load(
-        limit=100
+        limit=10000
     )
 
 

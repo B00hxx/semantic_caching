@@ -43,10 +43,9 @@ class PostgresService:
                 answer,
                 namespace,
                 created_at,
-                ttl_seconds,
                 hit_count
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
             """,
             entry.id,
             entry.question,
@@ -56,7 +55,6 @@ class PostgresService:
             entry.answer,
             entry.namespace,
             entry.created_at,
-            entry.ttl_seconds,
             entry.hit_count
         )
     async def get_top_entries(self, 
@@ -76,7 +74,6 @@ class PostgresService:
                 answer,
                 namespace,
                 created_at,
-                ttl_seconds,
                 hit_count
                 FROM cache_entries
                 WHERE embedding_model = $1
@@ -99,7 +96,6 @@ class PostgresService:
                 embedding_model=row["embedding_model"],
                 embedding_dimension=row["embedding_dimension"],
                 namespace=row["namespace"],
-                ttl_seconds=row["ttl_seconds"],
                 hit_count=row["hit_count"],
             )
             for row in rows

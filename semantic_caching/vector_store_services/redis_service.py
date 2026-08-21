@@ -7,6 +7,8 @@ from redis.commands.search.query import Query
 from .vector_store_services import VectorStore
 from .vector_search_result import VectorSearchResult
 from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from datetime import datetime, timezone
+
 class RedisService(VectorStore):
     def __init__(self, client: redis.Redis, dimension: int, prefix : str):
         self.client = client
@@ -44,7 +46,6 @@ class RedisService(VectorStore):
             index_type=IndexType.HASH
         )
         try:
-            # Awaited async index creation
             await self.client.ft(f"{self.prefix}_index").create_index(
                 schema,
                 definition=definition
@@ -53,23 +54,27 @@ class RedisService(VectorStore):
             print("INDEX CREATION LOG:", e)
 
     async def add_entry(self, entry: CacheEntryForRetrieval) -> str:
-        cache_id = f"{self.prefix}:{entry.id}" 
+        cache_id = f"{self.prefix}:{entry.id}"
         await self.client.hset(
-            cache_id,
-            mapping={
-                "question": entry.question,
-                "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
-                "answer": entry.answer,
-                "time": entry.created_at.isoformat(),
-                "ttl": entry.ttl_seconds,
-                "namespace" : entry.namespace
-            }
-        )
-        await self.client.expire(cache_id, entry.ttl_seconds)
+        cache_id,
+        mapping={
+            "question": entry.question,
+            "embedding": np.asarray(entry.embedding, dtype=np.float32).tobytes(),
+            "answer": entry.answer,
+            "created_at": entry.created_at.isoformat(),
+            "namespace": entry.namespace,
+            "hit_count": entry.hit_count,
+            "last_hit_at": (entry.last_hit_at.isoformat() if entry.last_hit_at else ""),
+            "last_accessed_at": (entry.last_accessed_at.isoformat() if entry.last_accessed_at else ""),
+        }
+    )
+        #await self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
     
-    async def get_entry(self, identifier: str):
-        return await self.client.hgetall(identifier)
+    
+    async def get_entry(self, identifier: uuid.UUID):
+        cache_id = f"{self.prefix}:{identifier}"
+        return await self.client.hgetall(cache_id)
     
     async def get_size(self) -> int:
         count = 0
@@ -92,7 +97,7 @@ class RedisService(VectorStore):
                 "(@namespace:{$ns})=>[KNN 1 @embedding $vec AS score]"
             )
             .sort_by("score")
-            .return_fields("question", "answer", "score", "time", "namespace")
+            .return_fields("question", "answer", "score", "created_at", "namespace")
             .dialect(2)
         )
         results = await self.client.ft(f"{self.prefix}_index").search(
@@ -114,12 +119,60 @@ class RedisService(VectorStore):
                 question=result.question,
                 score= 1 - score,
                 identifier = result.id,
-                time = result.time,
-                ttl = await self.ttl(result.id),
+                created_at = result.created_at,
                 namespace= result.namespace
             )
             return vector_search_result
         return None
+    
+    
+    async def update_access_metadata(self, identifier: str):
+        now = datetime.now(timezone.utc).isoformat()
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.hincrby(identifier, "hit_count", 1)
+            pipe.hset(
+                identifier,
+                mapping={
+                    "last_hit_at": now,
+                    "last_accessed_at": now,
+                    }
+                )
+            await pipe.execute()
+    
+    async def delete_entry(self, identifier: uuid.UUID):
+        cache_id = f"{self.prefix}:{identifier}"
+        return await self.client.delete(cache_id)
+    
+    async def get_all_entries(self) -> list[CacheEntryForRetrieval]:
+        entries = []
+        async for key in self.client.scan_iter(match=f"{self.prefix}:*"):
+            data = await self.client.hgetall(key)
+            if not data:
+                continue
+            entry = CacheEntryForRetrieval(
+                id=uuid.UUID(key.decode().split(":")[-1]),
+                question=data[b"question"].decode(),
+                embedding=np.frombuffer(
+                    data[b"embedding"],
+                    dtype=np.float32
+                ).tolist(),
+                answer=data[b"answer"].decode(),
+                created_at=datetime.fromisoformat(
+                    data[b"created_at"].decode()
+                ),
+                namespace=data[b"namespace"].decode(),
+                hit_count=int(data.get(b"hit_count", 0)),
+                last_hit_at=(
+                    datetime.fromisoformat(data[b"last_hit_at"].decode())
+                    if data.get(b"last_hit_at")
+                    else None
+                ),
+                last_accessed_at=(
+                    datetime.fromisoformat(data[b"last_accessed_at"].decode())
+                    if data.get(b"last_accessed_at")
+                    else None
+                ),
+            )
+            entries.append(entry)
 
-    async def ttl(self, identifier: str):
-        return await self.client.ttl(identifier)
+        return entries

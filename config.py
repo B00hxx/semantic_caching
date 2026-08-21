@@ -38,7 +38,7 @@ class RedisSettings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv('REDIS_HOST', 'localhost'))
     port: int = Field(default_factory=lambda: int(os.getenv('REDIS_PORT', 6379)))
     db: int = 0
-    decode_responses: bool = True
+    decode_responses: bool = False
 
     def get_client(self) -> redis.Redis:
         return redis.Redis(
@@ -70,6 +70,7 @@ class LiteLLMSettings(BaseModel):
     embedding_model_dimension : int = Field(default_factory=lambda: os.getenv('EMBEDDING_MODEL_DIMENSION'))
     
 class Settings(BaseSettings):
+    cache_invalidation_interval: int = 30
     lite_llm_settings : LiteLLMSettings = Field(default_factory=LiteLLMSettings)
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)
