@@ -38,7 +38,7 @@ class RedisSettings(BaseModel):
     host: str = Field(default_factory=lambda: os.getenv('REDIS_HOST', 'localhost'))
     port: int = Field(default_factory=lambda: int(os.getenv('REDIS_PORT', 6379)))
     db: int = 0
-    decode_responses: bool = True
+    decode_responses: bool = False
 
     def get_client(self) -> redis.Redis:
         return redis.Redis(

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from .vector_search_result import VectorSearchResult
-
+from uuid import UUID
 class VectorStore(ABC):
     @abstractmethod
     async def add_entry(self, entry):
@@ -32,4 +32,7 @@ class VectorStore(ABC):
     @abstractmethod
     async def get_all_entries(self):
         pass
-
+    @abstractmethod
+    async def delete_entry(self, identifier: UUID):
+        """Delete an entry from the vector store."""
+        pass

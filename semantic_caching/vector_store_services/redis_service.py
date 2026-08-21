@@ -145,5 +145,40 @@ class RedisService(VectorStore):
                 )
             await pipe.execute()
     
-    async def get_all_entries(self):
-        pass
+    async def delete_entry(self, identifier: uuid.UUID):
+        return await self.client.delete(identifier)
+    
+    async def get_all_entries(self) -> list[CacheEntryForRetrieval]:
+        entries = []
+        async for key in self.client.scan_iter(match=f"{self.prefix}:*"):
+            data = await self.client.hgetall(key)
+            if not data:
+                continue
+            entry = CacheEntryForRetrieval(
+                id=uuid.UUID(key.decode().split(":")[-1]),
+                question=data[b"question"].decode(),
+                embedding=np.frombuffer(
+                    data[b"embedding"],
+                    dtype=np.float32
+                ).tolist(),
+                answer=data[b"answer"].decode(),
+                ttl_seconds=int(data[b"ttl"]),
+                created_at=datetime.fromisoformat(
+                    data[b"created_at"].decode()
+                ),
+                namespace=data[b"namespace"].decode(),
+                hit_count=int(data.get(b"hit_count", 0)),
+                last_hit_at=(
+                    datetime.fromisoformat(data[b"last_hit_at"].decode())
+                    if data.get(b"last_hit_at")
+                    else None
+                ),
+                last_accessed_at=(
+                    datetime.fromisoformat(data[b"last_accessed_at"].decode())
+                    if data.get(b"last_accessed_at")
+                    else None
+                ),
+            )
+            entries.append(entry)
+
+        return entries

@@ -10,6 +10,7 @@ class CacheEntryForRetrieval(CacheEntry):
         answer: str,
         ttl_seconds: int = 3600,
         id: UUID | None = None,
+        created_at: datetime | None = None,
         namespace: str = "default",
         hit_count: int = 0,
         last_hit_at: datetime | None = None,
@@ -21,6 +22,7 @@ class CacheEntryForRetrieval(CacheEntry):
             embedding=embedding,
             answer=answer,
             ttl_seconds=ttl_seconds,
+            created_at=created_at,
         )
 
         if not namespace:
