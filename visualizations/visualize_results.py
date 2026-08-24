@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 
 
-with open("visualizations/results.json", "r") as file:
+with open("visualizations/final_results.json", "r") as file:
     results = json.load(file)
 
 

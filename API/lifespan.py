@@ -112,6 +112,7 @@ async def lifespan(app : FastAPI):
     app.state.ttl_cache = ttl_cache
     app.state.inactivity_cache = inactivity_cache
     app.state.hit_count_cache = hit_count_cache
+    app.state.lite_testing = ttl_cache
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
     app.state.postgres_service = postgres_service

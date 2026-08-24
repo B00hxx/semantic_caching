@@ -4,7 +4,8 @@ from semantic_caching.llm_services.ollama_service import OllamaLLM
 from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
 from semantic_caching.semantic_caching import SemanticCaching
 from semantic_caching.vector_store_services.redis_service import RedisService
-from ...config import settings
+from semantic_caching.cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from config import settings
 
 pytestmark = pytest.mark.asyncio
 
@@ -12,22 +13,47 @@ QUESTION = "what is the capital of france?"
 REFORMULATED_QUESTION = "what is France's capital?"
 ANOTHER_QUESTION = "how many stars are there in the milky way?"
 
-MODELS = {
-    "chat": "qwen2.5:0.5b",
-    "emb": "qwen3-embedding:0.6b",
-}
+
+async def _resolve_ollama_models(client):
+    chat_model = "qwen:0.5b"
+    emb_model = "qwen3-embedding:0.6b"
+
+    try:
+        tags = await client.list()
+        models = [m.model for m in tags.models] if hasattr(tags, "models") else []
+        for candidate in ["qwen:0.5b", "qwen2.5:0.5b", "qwen"]:
+            if any(candidate in m for m in models):
+                chat_model = candidate
+                break
+        for candidate in ["qwen3-embedding:0.6b", "qwen3-embedding", "nomic-embed-text"]:
+            if any(candidate in m for m in models):
+                emb_model = candidate
+                break
+    except Exception:
+        pass
+
+    return chat_model, emb_model
 
 
 async def _build_pipeline_components():
-    ollama_client = settings.ollama_client.get_client()
-    await ollama_client.list()
+    try:
+        ollama_client = settings.ollama_client.get_client()
+        await ollama_client.list()
+    except Exception as e:
+        pytest.skip(f"Ollama server not reachable: {e}")
 
-    redis_client = settings.redis_client.get_client()
-    await redis_client.ping()
+    try:
+        redis_client = settings.redis_client.get_client()
+        await redis_client.ping()
+    except Exception as e:
+        pytest.skip(f"Redis server not reachable: {e}")
 
-    llm = OllamaLLM(client=ollama_client, model_name=MODELS["chat"])
-    embedder = OllamaEmbeddingModel(client=ollama_client, embedding_model=MODELS["emb"])
-    redis_store = RedisService(client=redis_client, dimension=1024)
+    chat_model, emb_model = await _resolve_ollama_models(ollama_client)
+
+    llm = OllamaLLM(client=ollama_client, model_name=chat_model)
+    embedder = OllamaEmbeddingModel(client=ollama_client, embedding_model=emb_model)
+    redis_store = RedisService(client=redis_client, dimension=1024, prefix="test_integration")
+    await redis_store.initialize()
 
     return llm, embedder, redis_store
 
@@ -60,6 +86,8 @@ async def test_pipeline():
         llm_model=llm,
         embedding_model=embedder,
         vector_store=redis_store,
+        threshold=0.8,
+        namespace="test_integration",
     )
 
     await pipeline.vector_store.empty_database()
@@ -84,6 +112,8 @@ async def test_pipeline():
     assert answer_4["cache_hit"] is False
     assert pipeline.llm.calls == 2
 
+    await pipeline.vector_store.empty_database()
+
 
 async def test_caching_with_different_thresholds():
     """Test caching behavior with different similarity thresholds"""
@@ -92,6 +122,8 @@ async def test_caching_with_different_thresholds():
         llm_model=llm,
         embedding_model=embedder,
         vector_store=redis_store,
+        threshold=0.8,
+        namespace="test_integration",
     )
 
     await pipeline.vector_store.empty_database()
@@ -104,7 +136,9 @@ async def test_caching_with_different_thresholds():
 
     less_similar = "tell me about Paris"
     result = await pipeline.get_answers(query=less_similar)
-    assert result["cache_hit"] is False or result["cache_hit"] is True
+    assert "cache_hit" in result
+
+    await pipeline.vector_store.empty_database()
 
 
 async def test_redis_connection():
@@ -113,16 +147,17 @@ async def test_redis_connection():
     assert redis_store is not None
     assert redis_store.dimension == 1024
 
-    from semantic_caching.cache_entry import CacheEntry
-
-    entry = CacheEntry(
+    entry = CacheEntryForRetrieval(
         question="test",
-        embedding=np.array([0.1] * 1024),
+        embedding=np.array([0.1] * 1024, dtype=np.float32).tolist(),
         answer="test answer",
-        ttl_seconds=60,
+        namespace="test_integration",
     )
 
     cache_id = await redis_store.add_entry(entry)
     assert cache_id is not None
+
+    entry_data = await redis_store.get_entry(entry.id)
+    assert entry_data is not None
 
     await redis_store.empty_database()

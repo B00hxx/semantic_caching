@@ -117,12 +117,13 @@ class SemanticCaching:
                 }
             else:
                 logger.info("Good match was found, retrieving from Store")
-                await self.vector_store.update_access_metadata(identifier = response_from_vector_store.identifier)
-                try:
-                    id = response_from_vector_store.identifier.split(":", 1)[-1]
-                    await self.postgres.update_hit_count(id = id)
-                except Exception:
-                    logger.exception("Failed to update cache hit metrics")
+                await self.vector_store.update_access_metadata(identifier=response_from_vector_store.identifier)
+                if self.postgres:
+                    try:
+                        id = response_from_vector_store.identifier.split(":", 1)[-1]
+                        await self.postgres.update_hit_count(id=id)
+                    except Exception:
+                        logger.exception("Failed to update cache hit metrics")
                 
                 return {
                     "cache_hit" : True,
