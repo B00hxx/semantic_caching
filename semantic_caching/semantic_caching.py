@@ -6,12 +6,21 @@ from .vector_store_services.vector_store_services import VectorStore
 from .query import QueryProcessor
 from .postgres_service.postgres_service import PostgresService, CacheEntryForPersistence
 from .cache_invalidation.cache_invalidation_strategy import CacheInvalidationStrategy
-
+from .cache_eviction.cache_eviction_strategy import CacheEvictionStrategy
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 class SemanticCaching:
-    def __init__(self, llm_model: LLM, embedding_model: Embedder, vector_store: VectorStore, invalidation_strategy : CacheInvalidationStrategy | None = None, query_processor : QueryProcessor = None, threshold: float = 0.5, namespace : str = "default", postgres : PostgresService | None = None):
+    def __init__(self, 
+                 llm_model: LLM, 
+                 embedding_model: Embedder, 
+                 vector_store: VectorStore, 
+                 invalidation_strategy : CacheInvalidationStrategy | None = None,
+                 eviction_strategy : CacheEvictionStrategy | None = None, 
+                 query_processor : QueryProcessor = None, 
+                 threshold: float = 0.5, 
+                 namespace : str = "default", 
+                 postgres : PostgresService | None = None):
        
         self.llm = llm_model
         self.embedding = embedding_model
@@ -20,6 +29,7 @@ class SemanticCaching:
         self.query_processor = query_processor
         self.postgres = postgres
         self.invalidation_strategy = invalidation_strategy
+        self.cache_eviction_strategy = eviction_strategy
         
         if not namespace:
             raise ValueError("namespace cannot be empty")
@@ -62,6 +72,36 @@ class SemanticCaching:
                     entry.id
                 )
         return invalidated_count
+    
+    async def evict_entries(self, max_size: int) -> int:
+        if max_size < 0:
+            raise ValueError("max_size cannot be negative")
+        if self.eviction_strategy is None:
+            return 0
+        current_size = await self.vector_store.get_size()
+        if current_size <= max_size:
+            return 0
+        number_to_evict = current_size - max_size
+        entries = await self.vector_store.get_all_entries()
+        entries_to_evict = (
+            await self.eviction_strategy.select_entries_for_eviction(
+                entries,
+                number_to_evict
+            )
+        )
+        evicted_count = 0
+        for entry in entries_to_evict:
+            deleted = await self.vector_store.delete_entry(entry.id)
+            if deleted:
+                evicted_count += 1
+                logger.info(
+                    "Evicted cache entry %s", entry.id
+                )
+        logger.info(
+            "Cache eviction completed: %d entries evicted",evicted_count
+        )
+        return evicted_count
+    
     
     async def get_answers(self, query:str)->dict:
         spans = []
