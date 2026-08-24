@@ -108,6 +108,8 @@ async def lifespan(app : FastAPI):
     
     
     await ttl_cache.initialize(limit=10)
+    await inactivity_cache.initialize(limit=10)
+    await hit_count_cache.initialize(limit=10)
     
     app.state.ttl_cache = ttl_cache
     app.state.inactivity_cache = inactivity_cache
@@ -142,7 +144,7 @@ async def lifespan(app : FastAPI):
     yield
     load_dotenv()
     try:
-        feature_flag = (os.getenv("DELETE_ON_SHUTDOWN", "false").lower() == "true")
+        feature_flag = settings.delete_on_shutdown
         if feature_flag:
             await app.state.ttl_cache.vector_store.empty_database()
             await app.state.inactivity_cache.vector_store.empty_database()
