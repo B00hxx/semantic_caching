@@ -24,7 +24,7 @@ This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (
 
 ---
 
-## 🔍 Overview
+## Overview
 
 Querying Large Language Models directly for recurring or semantically equivalent prompts introduces unnecessary latency, high compute overhead, and privacy risks when user prompts contain sensitive Personally Identifiable Information (PII).
 
