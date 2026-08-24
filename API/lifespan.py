@@ -87,7 +87,7 @@ async def lifespan(app : FastAPI):
     #cache invalidation
     ttl_invalidation_strategy = TTLInvalidationStrategy(ttl_seconds=60)
     inactivity_invalidation_strategy = InactivityInvalidationStrategy(inactivity_seconds=60)
-    hit_count_invalidation_strategy = HitCountInvalidationStrategy(min_hit_count=5)
+    hit_count_invalidation_strategy = HitCountInvalidationStrategy(min_hit_count=2)
     
     #Cache
     fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=litellm_embedding_service, vector_store=testing_fake_redis, threshold=0.95, query_processor=query_processor, namespace="fake_test")

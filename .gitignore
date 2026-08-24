@@ -79,6 +79,8 @@ benchmark_outputs/
 .project
 .settings/
 
+*.parquet
+
 # Optional: ignore large model artifacts
 # models/
 # *.bin
