@@ -11,3 +11,7 @@ scrape_configs:
     metrics_path: /metrics/
     static_configs:
       - targets: ["litellm:4000"]
+  - job_name: "semantic-cache"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["fastapi:8000"]

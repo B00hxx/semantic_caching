@@ -7,8 +7,12 @@ from .routes.delete import router as delete_router
 from .routes.auth import router as auth_router
 from .routes.top_k_entries import router as postgres_router
 from .routes.get_all_hot_entries import router as hot_entries_router
+from prometheus_client import make_asgi_app
 
 app = FastAPI(lifespan=lifespan)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 app.include_router(chat_router)
 app.include_router(upload_router)
