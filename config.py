@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     presidio: PresidioSettings = Field(default_factory=PresidioSettings)
     postgres_service : PostgresSettings = Field(default_factory=PostgresSettings)
     delete_on_shutdown: bool = False
+    cache_eviction_interval: int = 45
+    cache_max_size: int = 100
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

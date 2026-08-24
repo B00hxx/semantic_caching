@@ -14,6 +14,9 @@ from semantic_caching.postgres_service.postgres_service import PostgresService
 from semantic_caching.cache_invalidation.ttl_invalidation_strategy import TTLInvalidationStrategy
 from semantic_caching.cache_invalidation.inactivity_invalidation_strategy import InactivityInvalidationStrategy
 from semantic_caching.cache_invalidation.hit_count_invalidation_strategy import HitCountInvalidationStrategy
+from semantic_caching.cache_eviction.lru_eviction_strategy import LRUEvictionStrategy
+from semantic_caching.cache_eviction.lfu_eviction_strategy import LFUEvictionStrategy
+from semantic_caching.cache_eviction.fifo_eviction_strategy import FIFOEvictionStrategy
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -33,6 +36,18 @@ async def invalidation_loop(cache, interval_seconds: int):
 
         await asyncio.sleep(interval_seconds)
 
+async def eviction_loop(cache, interval_seconds: int, max_size: int):
+    while True:
+        try:
+            evicted = await cache.evict_entries(max_size=max_size)
+            logger.info(
+                "Cache eviction completed: %d entries evicted",
+                evicted
+            )
+        except Exception:
+            logger.exception("Cache eviction failed")
+        await asyncio.sleep(interval_seconds)
+
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     redis_client = settings.redis_client.get_client()
@@ -50,6 +65,10 @@ async def lifespan(app : FastAPI):
     await inactivity_redis.initialize()
     await hit_count_redis.initialize()
 
+    #Eviction strategies
+    lru_eviction_strategy = LRUEvictionStrategy()
+    lfu_eviction_strategy = LFUEvictionStrategy()
+    fifo_eviction_strategy = FIFOEvictionStrategy()
     
     #LLMs
     lite_llm_service = LiteLLMService(
@@ -81,7 +100,8 @@ async def lifespan(app : FastAPI):
         threshold=0.8,
         postgres=postgres_service,
         namespace="ttl",
-        invalidation_strategy=ttl_invalidation_strategy
+        invalidation_strategy=ttl_invalidation_strategy,
+        eviction_strategy=lru_eviction_strategy
     )
 
     inactivity_cache = SemanticCaching(
@@ -92,7 +112,8 @@ async def lifespan(app : FastAPI):
         threshold=0.8,
         postgres=postgres_service,
         namespace="inactivity",
-        invalidation_strategy=inactivity_invalidation_strategy
+        invalidation_strategy=inactivity_invalidation_strategy,
+        eviction_strategy=lfu_eviction_strategy
     )
 
     hit_count_cache = SemanticCaching(
@@ -103,7 +124,8 @@ async def lifespan(app : FastAPI):
         threshold=0.8,
         postgres=postgres_service,
         namespace="hit_count",
-        invalidation_strategy=hit_count_invalidation_strategy
+        invalidation_strategy=hit_count_invalidation_strategy,
+        eviction_strategy=fifo_eviction_strategy
     )
     
     
@@ -140,6 +162,29 @@ async def lifespan(app : FastAPI):
             interval_seconds=settings.cache_invalidation_interval
         )
     )
+    ttl_eviction_task = asyncio.create_task(
+    eviction_loop(
+        app.state.ttl_cache,
+        interval_seconds=settings.cache_eviction_interval,
+        max_size=100
+        )
+    )
+
+    inactivity_eviction_task = asyncio.create_task(
+        eviction_loop(
+            app.state.inactivity_cache,
+            interval_seconds=settings.cache_eviction_interval,
+            max_size=100
+            )
+    )
+
+    hit_count_eviction_task = asyncio.create_task(
+        eviction_loop(
+            app.state.hit_count_cache,
+            interval_seconds=settings.cache_eviction_interval,
+            max_size=100
+        )
+    )
     
     yield
     load_dotenv()
@@ -162,11 +207,19 @@ async def lifespan(app : FastAPI):
             await postgres_service.close()
         except Exception as exc:
             print(f"PostgreSQL close skipped: {exc}")
-        
-        for task in (ttl_invalidation_task, inactivity_invalidation_task, hit_count_invalidation_task):
+        tasks = (
+            ttl_invalidation_task,
+            inactivity_invalidation_task,
+            hit_count_invalidation_task,
+            ttl_eviction_task,
+            inactivity_eviction_task,
+            hit_count_eviction_task,
+        )
+
+        for task in tasks:
             task.cancel()
 
-        for task in (ttl_invalidation_task, inactivity_invalidation_task, hit_count_invalidation_task):
+        for task in tasks:
             try:
                 await task
             except asyncio.CancelledError:

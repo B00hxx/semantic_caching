@@ -29,7 +29,7 @@ class SemanticCaching:
         self.query_processor = query_processor
         self.postgres = postgres
         self.invalidation_strategy = invalidation_strategy
-        self.cache_eviction_strategy = eviction_strategy
+        self.eviction_strategy = eviction_strategy
         
         if not namespace:
             raise ValueError("namespace cannot be empty")
