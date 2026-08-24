@@ -2,7 +2,7 @@
 
 A high-performance, privacy-first **Semantic Caching, PostgreSQL Persistence (`pgvector`) & PII Redaction Middleware** designed for Large Language Model (LLM) applications.
 
-This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (`pgvector`) Long-Term Persistence & Pre-warming**, **Multiple Cache Invalidation Strategies (TTL, Inactivity, Hit-Count)**, **Unified Model Gateway Routing (LiteLLM)**, **Automated PII Redaction with Dynamic Rule Hot-Reloading (Microsoft Presidio)**, **Local LLM & Embedding Inference (Ollama)**, **OAuth2 JWT Authentication**, and a **Benchmarking & Threshold Optimization Suite**.
+This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (`pgvector`) Long-Term Persistence & Pre-warming**, **Multiple Cache Invalidation & Eviction Strategies (TTL, Inactivity, Hit-Count, LRU, LFU, FIFO)**, **Unified Model Gateway Routing (LiteLLM)**, **Automated PII Redaction with Dynamic Rule Hot-Reloading (Microsoft Presidio)**, **Local LLM & Embedding Inference (Ollama)**, **OAuth2 JWT Authentication**, and a **Benchmarking & Threshold Optimization Suite**.
 
 ---
 
@@ -16,7 +16,7 @@ This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (
 - [Configuration & Environment Variables](#-configuration--environment-variables)
 - [Quick Start & Setup](#-quick-start--setup)
 - [API Endpoints Reference](#-api-endpoints-reference)
-- [Cache Invalidation Strategies](#-cache-invalidation-strategies)
+- [Cache Invalidation & Eviction Strategies](#-cache-invalidation--eviction-strategies)
 - [Custom PII Redaction Rules](#-custom-pii-redaction-rules)
 - [Benchmarking & Threshold Evaluation](#-benchmarking--threshold-evaluation)
 - [Testing](#-testing)
@@ -33,7 +33,7 @@ This middleware addresses these challenges through a unified multi-tiered archit
 1. **PII Detection & Anonymization**: Scans incoming queries using Presidio Analyzer. If sensitive entities are detected, the cache is bypassed to avoid leaking confidential data, and redacted prompts are stored.
 2. **Dynamic PII Rule Hot-Reloading**: Uploads YAML pattern recognizers on the fly without service interruptions or container restarts.
 3. **High-Speed Semantic Search (Redis HNSW)**: Computes dense vector embeddings and queries Redis Stack using an HNSW index with Cosine distance metric.
-4. **Multi-Strategy Invalidation**: Periodically evicts stale or low-utility entries using configurable strategies (TTL, Inactivity, and Hit-Count thresholds).
+4. **Multi-Strategy Invalidation & Capacity Eviction**: Periodically purges stale entries using configurable invalidation strategies (TTL, Inactivity, and Hit-Count thresholds) and enforces vector store capacity limits through pluggable eviction strategies (LRU, LFU, FIFO).
 5. **Durable Persistence & Startup Pre-Warming (PostgreSQL `pgvector`)**: Stores cache entries, embeddings, and access analytics (`hit_count`, `last_hit_at`, `last_accessed_at`) in PostgreSQL 17, and pre-warms top-K hit entries into Redis during application startup.
 6. **Unified Model Gateway (LiteLLM)**: Routes LLM inference and embeddings through a single proxy interface backed by Ollama or external providers.
 7. **OAuth2 JWT Authentication**: Secures administrative actions (cache clearing and rule uploads) with token-based access control.
@@ -99,10 +99,11 @@ This middleware addresses these challenges through a unified multi-tiered archit
 
 - **Asynchronous Semantic Caching**: Powered by Redis Stack using HNSW vector indexing (`FLOAT32`, Cosine distance metric) with namespace isolation.
 - **Persistent Database Layer (`pgvector`)**: Stores cache entries in PostgreSQL 17 for durability across restarts, tracking hit counts and timestamps (`hit_count`, `last_hit_at`, `last_accessed_at`), with startup pre-warming of top-K entries.
-- **Flexible Cache Invalidation Strategies**: Includes built-in strategies running on asynchronous background loops:
+- **Flexible Cache Invalidation & Eviction Strategies**: Includes built-in strategies running on asynchronous background loops:
   - **TTL Invalidation**: Evicts entries exceeding maximum time-to-live.
   - **Inactivity Invalidation**: Evicts entries inactive beyond a specified idle duration.
   - **Hit Count Invalidation**: Evicts entries with insufficient hit counts.
+  - **Capacity-Based Eviction (LRU, LFU, FIFO)**: Automatically prunes excess entries when the cache exceeds capacity limits (`max_size`), supporting Least Recently Used (LRU), Least Frequently Used (LFU), and First-In First-Out (FIFO) policies.
 - **Unified LiteLLM Gateway**: Proxies completions and embeddings across local models (Ollama) or external APIs via unified endpoints.
 - **Sensitive PII Data Detection & Redaction**: Automatically identifies sensitive entities (`PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IBAN_CODE`, `IP_ADDRESS`, `MEDICAL_LICENSE`, `EMPLOYEE_ID`, `CONFIDENTIAL_PROJECT`).
 - **Dynamic Presidio Recognizer Reloading**: Uploads custom YAML regex recognizers with hot reload of the Presidio Analyzer without restarting containers.
@@ -120,7 +121,7 @@ This middleware addresses these challenges through a unified multi-tiered archit
 .
 ├── API/                          # FastAPI web application layer
 │   ├── app.py                    # App factory & router registration
-│   ├── lifespan.py               # Startup/shutdown lifecycle, DB pre-warming & invalidation loops
+│   ├── lifespan.py               # Startup/shutdown lifecycle, DB pre-warming, invalidation & eviction loops
 │   ├── auth/                     # JWT authentication & security utilities
 │   │   └── security.py           # Password hashing, JWT token creation & admin dependencies
 │   ├── routes/                   # Modular API routers
@@ -154,8 +155,13 @@ This middleware addresses these challenges through a unified multi-tiered archit
 │   │   ├── cache_entry.py        # Base CacheEntry abstract class
 │   │   ├── cache_entry_persistent.py # PostgreSQL persistence entry model
 │   │   └── cache_entry_retrieval.py  # Redis retrieval entry model
-│   ├── cache_invalidation/       # Cache invalidation strategy implementations
-│   │   ├── cache_invalidation_strategy.py      # Abstract strategy interface
+│   ├── cache_eviction/           # Capacity-based cache eviction strategies
+│   │   ├── cache_eviction_strategy.py   # Abstract eviction strategy interface
+│   │   ├── fifo_eviction_strategy.py    # First-In, First-Out (FIFO) eviction
+│   │   ├── lfu_eviction_strategy.py     # Least Frequently Used (LFU) eviction
+│   │   └── lru_eviction_strategy.py     # Least Recently Used (LRU) eviction
+│   ├── cache_invalidation/       # Time & condition-based cache invalidation strategies
+│   │   ├── cache_invalidation_strategy.py      # Abstract invalidation strategy interface
 │   │   ├── ttl_invalidation_strategy.py         # Time-to-Live invalidation
 │   │   ├── inactivity_invalidation_strategy.py  # Inactivity idle duration invalidation
 │   │   └── hit_count_invalidation_strategy.py   # Hit-count threshold invalidation
@@ -247,6 +253,8 @@ Settings are defined in [`config.py`](config.py) and loaded from environment var
 | `API_KEY_EMB` | *(Configured)* | API Key for LiteLLM embedding service |
 | `EMBEDDING_MODEL_DIMENSION` | `1024` | Vector dimension size of embeddings |
 | `CACHE_INVALIDATION_INTERVAL` | `30` | Interval (in seconds) between background invalidation cycles |
+| `CACHE_EVICTION_INTERVAL` | `45` | Interval (in seconds) between background capacity eviction cycles |
+| `CACHE_MAX_SIZE` | `100` | Maximum number of entries allowed in vector cache before capacity eviction triggers |
 | `DELETE_ON_SHUTDOWN` | `true` | Wipes Redis vector cache upon application shutdown |
 | `JWT_SECRET_KEY` | *(Required)* | Secret key for signing OAuth2 JWT tokens |
 | `ADMIN_USERNAME` | *(Required)* | Admin username for protected routes |
@@ -318,8 +326,8 @@ Authenticates an administrator and generates a JWT Bearer token.
 
 ### 2. Semantic Caching & Chat Endpoints
 
-#### Ask with TTL Invalidation (`POST /chat/ttl_cache`)
-Queries the semantic cache instance configured with a **Time-To-Live (TTL)** invalidation strategy (default: 60 seconds).
+#### Ask with TTL Invalidation & LRU Eviction (`POST /chat/ttl_cache`)
+Queries the semantic cache instance configured with a **Time-To-Live (TTL)** invalidation strategy (default: 60 seconds) and **Least Recently Used (LRU)** capacity eviction (`max_size=100`).
 - **Request Body**:
   ```json
   {
@@ -354,11 +362,11 @@ Queries the semantic cache instance configured with a **Time-To-Live (TTL)** inv
   }
   ```
 
-#### Ask with Inactivity Invalidation (`POST /chat/inactivity_cache`)
-Queries the cache instance configured with an **Inactivity** invalidation strategy (evicts entries after 60 seconds of idle time without access).
+#### Ask with Inactivity Invalidation & LFU Eviction (`POST /chat/inactivity_cache`)
+Queries the cache instance configured with an **Inactivity** invalidation strategy (invalidates entries after 60 seconds of idle time without access) and **Least Frequently Used (LFU)** capacity eviction (`max_size=100`).
 
-#### Ask with Hit Count Invalidation (`POST /chat/hit_count_cache`)
-Queries the cache instance configured with a **Hit Count** invalidation strategy (evicts entries with fewer than 5 hits).
+#### Ask with Hit Count Invalidation & FIFO Eviction (`POST /chat/hit_count_cache`)
+Queries the cache instance configured with a **Hit Count** invalidation strategy (invalidates entries with fewer than 5 hits) and **First-In First-Out (FIFO)** capacity eviction (`max_size=100`).
 
 #### Fast Ask for Benchmarking (`POST /chat/fake_ask`)
 Queries a high-speed mock LLM cache instance (`threshold=0.95`) designed for evaluation pipelines and throughput benchmarks.
@@ -456,21 +464,86 @@ Uploads a custom YAML recognizer rule file and triggers an immediate hot reload 
 
 ---
 
-## Cache Invalidation Strategies
+## Cache Invalidation & Eviction Strategies
 
-The middleware implements the **Strategy Pattern** for extensible cache eviction:
+The middleware implements the **Strategy Pattern** across two complementary memory and lifecycle management layers:
 
-1. **`TTLInvalidationStrategy`**:
-   - Evicts an entry when its total age `(now - created_at)` exceeds `ttl_seconds`.
-   - Best for time-sensitive queries whose underlying ground truth changes frequently.
-2. **`InactivityInvalidationStrategy`**:
-   - Evicts an entry when the duration since last access `(now - (last_accessed_at or created_at))` exceeds `inactivity_seconds`.
-   - Best for maintaining active context while pruning abandoned topics.
-3. **`HitCountInvalidationStrategy`**:
-   - Evicts entries whose `hit_count` falls below a minimum threshold (`min_hit_count`).
-   - Best for cleaning low-utility one-off queries and freeing vector memory for high-value prompts.
+1. **Cache Invalidation (Time & Condition-Based)**: Proactively purges individual stale, inactive, or low-utility entries during periodic sweeps regardless of total cache size.
+2. **Cache Eviction (Capacity & Size-Based)**: Enforces memory boundaries when the number of cached entries exceeds `max_size` (e.g., 100 entries), algorithmically pruning excess entries based on access recency, frequency, or insertion order.
 
-A background worker task (`invalidation_loop`) executes periodically (every `CACHE_INVALIDATION_INTERVAL` seconds) to purge matching entries without blocking incoming request traffic.
+```
+                  ┌─────────────────────────────────────────────────────────┐
+                  │                 Semantic Caching Layer                  │
+                  └────────────┬───────────────────────────────┬────────────┘
+                               │                               │
+                Periodic Check │ (Every 30s)    Periodic Check │ (Every 45s if size > max_size)
+                               ▼                               ▼
+                 ┌───────────────────────────┐   ┌───────────────────────────┐
+                 │ Cache Invalidation Engine │   │   Cache Eviction Engine   │
+                 └─────────────┬─────────────┘   └─────────────┬─────────────┘
+                               │                               │
+            ┌──────────────────┼──────────────────┐            ├──────────────────┬──────────────────┐
+            ▼                  ▼                  ▼            ▼                  ▼                  ▼
+     ┌──────────────┐   ┌──────────────┐   ┌──────────────┐ ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+     │     TTL      │   │  Inactivity  │   │  Hit-Count   │ │     LRU      │   │     LFU      │   │     FIFO     │
+     │ Invalidation │   │ Invalidation │   │ Invalidation │ │   Eviction   │   │   Eviction   │   │   Eviction   │
+     └──────────────┘   └──────────────┘   └──────────────┘ └──────────────┘   └──────────────┘   └──────────────┘
+```
+
+---
+
+### 1. Cache Invalidation Strategies
+
+Invalidation strategies evaluate each cache entry independently during background sweeps to discard entries that have expired or failed utility criteria:
+
+- **`TTLInvalidationStrategy` (Time-To-Live)**:
+  - **Rule**: Invalidate if `(now - created_at) > ttl_seconds`.
+  - **Default Configuration**: `ttl_seconds = 60` seconds.
+  - **Use Case**: Real-time or rapidly changing data (news, stock prices, live weather) where responses expire after a fixed lifespan.
+- **`InactivityInvalidationStrategy`**:
+  - **Rule**: Invalidate if `(now - (last_accessed_at or created_at)) > inactivity_seconds`.
+  - **Default Configuration**: `inactivity_seconds = 60` seconds.
+  - **Use Case**: Session-based dialogs and interactive multi-turn workflows where conversations naturally expire once idle.
+- **`HitCountInvalidationStrategy`**:
+  - **Rule**: Invalidate if `hit_count < min_hit_count`.
+  - **Default Configuration**: `min_hit_count = 5` hits.
+  - **Use Case**: Periodic garbage collection of rare one-off queries to reserve vector memory for high-yield prompts.
+
+> **Background Lifecycle**: Controlled by `invalidation_loop(cache, interval_seconds=settings.cache_invalidation_interval)` running every **30 seconds** asynchronously.
+
+---
+
+### 2. Cache Eviction Strategies
+
+Eviction strategies manage vector database capacity. When `current_size > max_size`, the strategy calculates `number_to_evict = current_size - max_size` and ranks entries to prune:
+
+- **`LRUEvictionStrategy` (Least Recently Used)**:
+  - **Algorithm**: Sorts entries by effective last access time (`entry.last_accessed_at if entry.last_accessed_at is not None else entry.created_at`) ascending and selects the oldest `k` entries.
+  - **Assigned Route**: Paired with `ttl_cache` (`POST /chat/ttl_cache`).
+  - **Use Case**: General-purpose conversational caching where recently referenced topics are significantly more likely to be queried again (temporal locality).
+- **`LFUEvictionStrategy` (Least Frequently Used)**:
+  - **Algorithm**: Sorts entries by total `entry.hit_count` ascending and selects the lowest-frequency `k` entries.
+  - **Assigned Route**: Paired with `inactivity_cache` (`POST /chat/inactivity_cache`).
+  - **Use Case**: Workloads with heavy power-law query distributions (e.g., FAQ knowledge bases), keeping popular questions resident even during temporary lulls in traffic.
+- **`FIFOEvictionStrategy` (First-In, First-Out)**:
+  - **Algorithm**: Sorts entries strictly by creation timestamp (`entry.created_at`) ascending and selects the oldest inserted `k` entries.
+  - **Assigned Route**: Paired with `hit_count_cache` (`POST /chat/hit_count_cache`).
+  - **Use Case**: Streaming logs, time-series data feeds, or sequential pipelines where entries have uniform longevity.
+
+> **Background Lifecycle**: Controlled by `eviction_loop(cache, interval_seconds=settings.cache_eviction_interval, max_size=settings.cache_max_size)` running every **45 seconds** with `max_size=100`.
+
+---
+
+### 3. Strategy Summary & Comparison Matrix
+
+| Strategy Name | Category | Primary Metric | Trigger Condition | Default Endpoint | Best For |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`TTLInvalidationStrategy`** | Invalidation | `created_at` age | `elapsed > ttl_seconds` | `/chat/ttl_cache` | Time-sensitive, volatile data |
+| **`InactivityInvalidationStrategy`** | Invalidation | `last_accessed_at` age | `idle > inactivity_seconds` | `/chat/inactivity_cache` | Interactive sessions & active topics |
+| **`HitCountInvalidationStrategy`** | Invalidation | `hit_count` | `hit_count < min_hit_count` | `/chat/hit_count_cache` | Pruning cold, one-off prompts |
+| **`LRUEvictionStrategy`** | Eviction | Recency (`last_accessed_at`) | `cache_size > max_size` | `/chat/ttl_cache` | Temporal locality & conversational caching |
+| **`LFUEvictionStrategy`** | Eviction | Frequency (`hit_count`) | `cache_size > max_size` | `/chat/inactivity_cache` | Highly skewed FAQ & popular query distributions |
+| **`FIFOEvictionStrategy`** | Eviction | Age (`created_at`) | `cache_size > max_size` | `/chat/hit_count_cache` | Rolling queue & streaming pipelines |
 
 ---
 
