@@ -43,9 +43,11 @@ class PostgresService:
                 answer,
                 namespace,
                 created_at,
-                hit_count
+                hit_count,
+                last_hit_at,
+                last_accessed_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
             """,
             entry.id,
             entry.question,
@@ -55,7 +57,9 @@ class PostgresService:
             entry.answer,
             entry.namespace,
             entry.created_at,
-            entry.hit_count
+            entry.hit_count,
+            entry.last_hit_at,
+            entry.last_accessed_at
         )
     async def get_top_entries(self, 
                               embedding_model: str, 
@@ -74,7 +78,9 @@ class PostgresService:
                 answer,
                 namespace,
                 created_at,
-                hit_count
+                hit_count,
+                last_hit_at,
+                last_accessed_at
                 FROM cache_entries
                 WHERE embedding_model = $1
                 AND embedding_dimension = $2
@@ -97,9 +103,13 @@ class PostgresService:
                 embedding_dimension=row["embedding_dimension"],
                 namespace=row["namespace"],
                 hit_count=row["hit_count"],
+                created_at=row["created_at"],
+                last_hit_at=row["last_hit_at"],
+                last_accessed_at=row["last_accessed_at"],
             )
             for row in rows
         ]
+
     async def update_hit_count(self, id : UUID):
         async with self.pool.acquire() as connection:
             await connection.execute(

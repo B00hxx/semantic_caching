@@ -11,7 +11,7 @@ class CacheEntryForPersistence(CacheEntry):
         question: str,
         embedding: list[float],
         answer: str,
-        namespace: str,
+        namespace: str | None = None,
         hit_count: int = 0,
         id: UUID | None = None,
         created_at: datetime | None = None,

@@ -109,7 +109,7 @@ class SemanticCaching:
         )
         if evicted_count > 0:
             CACHE_EVICTIONS.labels(
-                strategy=self.cache_eviction_strategy.__class__.__name__
+                strategy=self.eviction_strategy.__class__.__name__
             ).inc(evicted_count)
         CACHE_SIZE.set(await self.vector_store.get_size())
         return evicted_count
@@ -196,9 +196,9 @@ class SemanticCaching:
                 }
         else:
             CACHE_BYPASSES.inc()
-            logger.info("PII discovered, send to LLM directly")
-            answer_by_llm = await self.llm.generate(query=query)
             redacted_query = self.query_processor.redact(query = query, analyzer_results=spans)
+            logger.info("PII discovered, bypassing cache and sending original query to LLM")
+            answer_by_llm = await self.llm.generate(query=query)
             if self.postgres:
                 try:
                     entry_persistent = CacheEntryForPersistence(
@@ -207,7 +207,7 @@ class SemanticCaching:
                                             answer=answer_by_llm,
                                             embedding_model= "None",
                                             embedding_dimension = 0,
-                                            namespace="None",
+                                            namespace=None,
                                         )
                     await self.postgres.save_entry(entry_persistent)
                 except Exception:

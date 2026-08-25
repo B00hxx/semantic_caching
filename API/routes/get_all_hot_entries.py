@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
+from API.auth.security import User, get_current_admin
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("/get_all_entries")
-async def get_all_entries(request: Request):
+async def get_all_entries(request: Request, current_user: User = Depends(get_current_admin)):
     entries = await request.app.state.lite_testing.vector_store.get_all_entries()
 
     return {
