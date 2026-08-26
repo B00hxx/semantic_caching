@@ -6,7 +6,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 @router.get("/get_all_entries")
 async def get_all_entries(request: Request, current_user: User = Depends(get_current_admin)):
-    entries = await request.app.state.lite_testing.vector_store.get_all_entries()
+    entries = await request.app.state.ttl_cache.vector_store.get_all_entries()
 
     return {
         "count": len(entries),

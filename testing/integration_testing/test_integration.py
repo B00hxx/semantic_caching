@@ -4,7 +4,7 @@ from semantic_caching.llm_services.ollama_service import OllamaLLM
 from semantic_caching.embedding_services.ollama_embedding import OllamaEmbeddingModel
 from semantic_caching.semantic_caching import SemanticCaching
 from semantic_caching.vector_store_services.redis_service import RedisService
-from semantic_caching.cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from semantic_caching.cache_entry import CacheEntry
 from config import settings
 
 pytestmark = pytest.mark.asyncio
@@ -147,7 +147,7 @@ async def test_redis_connection():
     assert redis_store is not None
     assert redis_store.dimension == 1024
 
-    entry = CacheEntryForRetrieval(
+    entry = CacheEntry(
         question="test",
         embedding=np.array([0.1] * 1024, dtype=np.float32).tolist(),
         answer="test answer",

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 DATASET_DIRECTORY = "benchmark/datasets/lmsys-chat-1m"
-MAX_QUERIES = 10000
+MAX_QUERIES = 100000
 
 ENDPOINTS = [
     "http://localhost:8000/chat/ttl_cache",

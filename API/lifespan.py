@@ -21,32 +21,39 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-async def invalidation_loop(cache, interval_seconds: int):
+async def invalidation_loop(cache : SemanticCaching, interval_seconds: int = 1000):
     while True:
+        await asyncio.sleep(interval_seconds)
         try:
             invalidated = await cache.invalidate_entries()
-
             logger.info(
                 "Cache invalidation completed: %d entries invalidated",
                 invalidated
             )
-
         except Exception:
             logger.exception("Cache invalidation failed")
 
-        await asyncio.sleep(interval_seconds)
-
-async def eviction_loop(cache, interval_seconds: int, max_size: int):
+async def eviction_loop(cache : SemanticCaching, interval_seconds: int = 1000, max_size: int = 100):
     while True:
+        await asyncio.sleep(interval_seconds)
         try:
-            evicted = await cache.evict_entries(max_size=max_size)
-            logger.info(
-                "Cache eviction completed: %d entries evicted",
-                evicted
-            )
+            current_size = await cache.vector_store.get_size()
+            if current_size <= max_size:
+                logger.info(
+                    "Cache eviction skipped: current size (%d) is within the limit (%d)",
+                    current_size,
+                    max_size
+                )
+                await asyncio.sleep(interval_seconds)
+                continue
+            else:
+                evicted = await cache.evict_entries(max_size=max_size)
+                logger.info(
+                    "Cache eviction completed: %d entries evicted",
+                    evicted
+                )
         except Exception:
             logger.exception("Cache eviction failed")
-        await asyncio.sleep(interval_seconds)
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
@@ -85,10 +92,10 @@ async def lifespan(app : FastAPI):
     
     
     #cache invalidation
-    ttl_invalidation_strategy = TTLInvalidationStrategy(ttl_seconds=60)
-    inactivity_invalidation_strategy = InactivityInvalidationStrategy(inactivity_seconds=60)
-    hit_count_invalidation_strategy = HitCountInvalidationStrategy(min_hit_count=2)
-    
+    ttl_invalidation_strategy = TTLInvalidationStrategy(ttl_seconds=settings.cache_ttl_seconds)
+    inactivity_invalidation_strategy = InactivityInvalidationStrategy(inactivity_seconds=settings.cache_inactivity_seconds)
+    hit_count_invalidation_strategy = HitCountInvalidationStrategy(min_hit_count=settings.cache_min_hit_count)
+
     #Cache
     fake_testing = SemanticCaching(llm_model=fake_llm, embedding_model=litellm_embedding_service, vector_store=testing_fake_redis, threshold=0.95, query_processor=query_processor, namespace="fake_test")
     
@@ -136,7 +143,6 @@ async def lifespan(app : FastAPI):
     app.state.ttl_cache = ttl_cache
     app.state.inactivity_cache = inactivity_cache
     app.state.hit_count_cache = hit_count_cache
-    app.state.lite_testing = ttl_cache
     app.state.redis_client = redis_client
     app.state.fake_testing = fake_testing
     app.state.postgres_service = postgres_service
@@ -152,7 +158,7 @@ async def lifespan(app : FastAPI):
     inactivity_invalidation_task = asyncio.create_task(
         invalidation_loop(
             app.state.inactivity_cache,
-            interval_seconds=settings.cache_invalidation_interval
+            interval_seconds=settings.cache_inactivity_seconds
         )
     )
 
