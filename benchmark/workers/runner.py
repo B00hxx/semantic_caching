@@ -104,37 +104,8 @@ class WorkerRunner:
             worker.worker_id,
             endpoint,
         )
-
-    def _distribute_queries(
-        self,
-        queries: list[str],
-    ) -> list[list[str]]:
-
-        number_of_workers = len(self.workers)
-
-        worker_queries: list[list[str]] = [
-            []
-            for _ in range(number_of_workers)
-        ]
-
-        # Round-robin distribution.
-        #
-        # Example with 6 workers:
-        #
-        # query 0 -> worker 0
-        # query 1 -> worker 1
-        # query 2 -> worker 2
-        # query 3 -> worker 3
-        # ...
-        # query 6 -> worker 0
-        #
-        for index, query in enumerate(queries):
-
-            worker_index = index % number_of_workers
-
-            worker_queries[worker_index].append(query)
-
-        return worker_queries
+    def _distribute_queries(self, queries: list[str]) -> list[list[str]]:
+        return [list(queries) for _ in self.workers]
 
     async def run(
         self,

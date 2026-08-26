@@ -74,11 +74,11 @@ class LiteLLMSettings(BaseModel):
     embedding_model_dimension : int = Field(default_factory=lambda: os.getenv('EMBEDDING_MODEL_DIMENSION'))
     
 class Settings(BaseSettings):
-    cache_ttl_seconds : int = 3600
-    cache_inactivity_seconds : int = 3600
+    cache_ttl_seconds : int = 900
+    cache_inactivity_seconds : int = 900
     cache_min_hit_count : int = 2
     
-    cache_invalidation_interval: int = 3600
+    cache_invalidation_interval: int = 900
     lite_llm_settings : LiteLLMSettings = Field(default_factory=LiteLLMSettings)
     redis_client: RedisSettings = Field(default_factory=RedisSettings)
     ollama_client: OllamaSettings = Field(default_factory=OllamaSettings)

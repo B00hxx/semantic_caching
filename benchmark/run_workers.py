@@ -19,9 +19,12 @@ ENDPOINTS = [
     "http://localhost:8000/chat/ttl_cache",
     "http://localhost:8000/chat/inactivity_cache",
     "http://localhost:8000/chat/hit_count_cache",
+    "http://localhost:8000/chat/fifo_eviction_cache",
+    "http://localhost:8000/chat/lfu_eviction_cache",
+    "http://localhost:8000/chat/lru_eviction_cache",
 ]
 
-WORKERS_PER_ENDPOINT = 2
+WORKERS_PER_ENDPOINT = 1
 
 
 async def main():
