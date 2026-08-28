@@ -5,26 +5,23 @@ from .workers.runner import WorkerRunner
 from .workers.dataset_loader import load_lmsys_queries
 
 
-logging.basicConfig(
-    level=logging.INFO,
-)
+logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
 
 DATASET_DIRECTORY = "benchmark/datasets/lmsys-chat-1m"
-MAX_QUERIES = 100000
+
+MAX_QUERIES = 1000
 
 ENDPOINTS = [
-    "http://localhost:8000/chat/ttl_cache",
-    "http://localhost:8000/chat/inactivity_cache",
-    "http://localhost:8000/chat/hit_count_cache",
-    "http://localhost:8000/chat/fifo_eviction_cache",
-    "http://localhost:8000/chat/lfu_eviction_cache",
-    "http://localhost:8000/chat/lru_eviction_cache",
+    ("TTL", "http://127.0.0.1:8000/chat/ttl_cache"),
+    ("Inactivity", "http://127.0.0.1:8000/chat/inactivity_cache"),
+    ("Hit Count", "http://127.0.0.1:8000/chat/hit_count_cache"),
+    ("FIFO", "http://127.0.0.1:8000/chat/fifo_eviction_cache"),
+    ("LFU", "http://127.0.0.1:8000/chat/lfu_eviction_cache"),
+    ("LRU", "http://127.0.0.1:8000/chat/lru_eviction_cache"),
 ]
-
-WORKERS_PER_ENDPOINT = 1
 
 
 async def main():
@@ -34,46 +31,48 @@ async def main():
         max_queries=MAX_QUERIES,
     )
 
-    logger.info(
-        "Loaded %d queries",
-        len(queries),
-    )
+    logger.info("Loaded %d queries", len(queries))
 
-    runner = WorkerRunner(
-        endpoints=ENDPOINTS,
-        workers_per_endpoint=WORKERS_PER_ENDPOINT,
-    )
+    for name, endpoint in ENDPOINTS:
 
-    results = await runner.run(
-        queries=queries,
-    )
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("STARTING: %s", name)
+        logger.info("ENDPOINT: %s", endpoint)
+        logger.info("=" * 70)
 
-    successful = sum(
-        result["status_code"] == 200
-        for result in results
-    )
+        runner = WorkerRunner(
+            endpoint=endpoint,
+        )
 
-    cache_hits = sum(
-        result.get("cache_hit", False)
-        for result in results
-    )
+        results = await runner.run(
+            queries=queries,
+        )
 
-    logger.info(
-        "Finished: %d/%d successful requests",
-        successful,
-        len(results),
-    )
+        successful = sum(
+            r["status_code"] == 200
+            for r in results
+        )
 
-    logger.info(
-        "Cache hits: %d",
-        cache_hits,
-    )
+        cache_hits = sum(
+            r.get("cache_hit", False)
+            for r in results
+            if r["status_code"] == 200
+        )
 
-    if results:
-        hit_rate = cache_hits / len(results)
+        hit_rate = (
+            cache_hits / successful
+            if successful
+            else 0
+        )
 
+        logger.info("")
         logger.info(
-            "Overall cache hit rate: %.2f%%",
+            "%s COMPLETE | successful=%d/%d | hits=%d | hit_rate=%.2f%%",
+            name,
+            successful,
+            len(results),
+            cache_hits,
             hit_rate * 100,
         )
 

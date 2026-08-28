@@ -58,7 +58,9 @@ async def eviction_loop(cache : SemanticCaching, interval_seconds: int = 1000, m
 
 @asynccontextmanager
 async def lifespan(app : FastAPI):
+    logger.info("LIFESPAN: starting")
     redis_client = settings.redis_client.get_client()
+    logger.info("LIFESPAN: Redis client created")
     
     #Initialize different Redis services
     ttl_redis = RedisService(client=redis_client, dimension=1024, prefix="lite_ttl")
@@ -71,17 +73,44 @@ async def lifespan(app : FastAPI):
     
     testing_fake_redis = RedisService(client=redis_client, dimension=1024, prefix="fake_cache")
     
+    logger.info("LIFESPAN: Redis services created")
+    
     query_processor = QueryProcessor()
     postgres_service = await settings.postgres_service.get_service()
 
-    await testing_fake_redis.initialize()
-    await ttl_redis.initialize()
-    await inactivity_redis.initialize()
-    await hit_count_redis.initialize()
-    await fifo_eviction_redis.initialize()
-    await lfu_eviction_redis.initialize()
-    await lru_eviction_redis.initialize()
+    logger.info("LIFESPAN: getting PostgreSQL service")
+    postgres_service = await settings.postgres_service.get_service()
+    logger.info("LIFESPAN: PostgreSQL service ready")
 
+    logger.info("LIFESPAN: initializing fake Redis")
+    await testing_fake_redis.initialize()
+    logger.info("LIFESPAN: fake Redis ready")
+
+    logger.info("LIFESPAN: initializing TTL Redis")
+    await ttl_redis.initialize()
+    logger.info("LIFESPAN: TTL Redis ready")
+
+    logger.info("LIFESPAN: initializing inactivity Redis")
+    await inactivity_redis.initialize()
+    logger.info("LIFESPAN: inactivity Redis ready")
+
+    logger.info("LIFESPAN: initializing hit-count Redis")
+    await hit_count_redis.initialize()
+    logger.info("LIFESPAN: hit-count Redis ready")
+
+    logger.info("LIFESPAN: initializing FIFO Redis")
+    await fifo_eviction_redis.initialize()
+    logger.info("LIFESPAN: FIFO Redis ready")
+
+    logger.info("LIFESPAN: initializing LFU Redis")
+    await lfu_eviction_redis.initialize()
+    logger.info("LIFESPAN: LFU Redis ready")
+
+    logger.info("LIFESPAN: initializing LRU Redis")
+    await lru_eviction_redis.initialize()
+    logger.info("LIFESPAN: LRU Redis ready")
+
+    logger.info("LIFESPAN: all Redis services initialized")
 
     #Eviction strategies
     lru_eviction_strategy = LRUEvictionStrategy()

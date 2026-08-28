@@ -8,7 +8,6 @@ class LiteLLMService(LLM):
         api_key: str,
         model_name: str,
         link: str = "http://localhost:4000",
-        timeout: float = 300.0,
         max_retries: int = 1,
     ):
         self.api_key = api_key
@@ -18,7 +17,7 @@ class LiteLLMService(LLM):
         self.client = AsyncOpenAI(
             api_key=api_key,
             base_url=f"{link}/v1",
-            timeout=timeout,
+            timeout=None,
             max_retries=max_retries,
         )
 
