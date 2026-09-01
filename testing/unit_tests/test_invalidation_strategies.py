@@ -16,6 +16,7 @@ async def test_ttl_invalidation_strategy():
         embedding=[0.1, 0.2, 0.3],
         answer="Time to live",
         created_at=datetime.now(timezone.utc),
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(fresh_entry) is False
 
@@ -25,6 +26,7 @@ async def test_ttl_invalidation_strategy():
         embedding=[0.1, 0.2, 0.3],
         answer="Time to live",
         created_at=datetime.now(timezone.utc) - timedelta(seconds=100),
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(old_entry) is True
 
@@ -49,6 +51,7 @@ async def test_inactivity_invalidation_strategy():
         answer="Inactivity test",
         created_at=datetime.now(timezone.utc) - timedelta(seconds=200),
         last_accessed_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(active_entry) is False
 
@@ -58,12 +61,8 @@ async def test_inactivity_invalidation_strategy():
         embedding=[0.1, 0.2, 0.3],
         answer="Inactivity test",
         created_at=datetime.now(timezone.utc) - timedelta(seconds=200),
-        last_accessed_at=datetime.now(timezone.utc) - timedelta(seconds=120),
-        question="What is Inactivity?",
-        embedding=[0.1, 0.2, 0.3],
-        answer="Inactivity test",
-        created_at=datetime.now(timezone.utc) - timedelta(seconds=200),
-        last_accessed_at=datetime.now(timezone.utc) - timedelta(seconds=120),
+        last_hit_at=datetime.now(timezone.utc) - timedelta(seconds=120),
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(inactive_entry) is True
 
@@ -78,6 +77,7 @@ async def test_hit_count_invalidation_strategy():
         embedding=[0.1, 0.2, 0.3],
         answer="Hit count test",
         hit_count=3,
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(low_hit_entry) is True
 
@@ -87,5 +87,6 @@ async def test_hit_count_invalidation_strategy():
         embedding=[0.1, 0.2, 0.3],
         answer="Hit count test",
         hit_count=10,
+        namespace="test_namespace"
     )
     assert await strategy.should_invalidate_entry(high_hit_entry) is False
