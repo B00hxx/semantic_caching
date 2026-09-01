@@ -21,6 +21,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     container_name: litellm-postgres
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: litellm
       POSTGRES_USER: litellm
