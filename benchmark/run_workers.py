@@ -12,15 +12,10 @@ logger = logging.getLogger(__name__)
 
 DATASET_DIRECTORY = "benchmark/datasets/lmsys-chat-1m"
 
-MAX_QUERIES = 1000
+MAX_QUERIES = 100
 
 ENDPOINTS = [
-    ("TTL", "http://127.0.0.1:8000/chat/ttl_cache"),
-    ("Inactivity", "http://127.0.0.1:8000/chat/inactivity_cache"),
     ("Hit Count", "http://127.0.0.1:8000/chat/hit_count_cache"),
-    ("FIFO", "http://127.0.0.1:8000/chat/fifo_eviction_cache"),
-    ("LFU", "http://127.0.0.1:8000/chat/lfu_eviction_cache"),
-    ("LRU", "http://127.0.0.1:8000/chat/lru_eviction_cache"),
 ]
 
 

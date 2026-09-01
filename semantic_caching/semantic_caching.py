@@ -127,6 +127,7 @@ class SemanticCaching:
     
     
     async def get_answers(self, query:str)->dict:
+        logger.info("Received query: %s", query)
         CACHE_REQUESTS.labels(cache=self.cache_name).inc()
         spans = []
         if self.query_processor is not None:
