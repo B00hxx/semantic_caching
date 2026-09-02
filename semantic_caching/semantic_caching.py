@@ -1,12 +1,14 @@
+import time
 import logging
 from .llm_services.llm_service import LLM
 from .embedding_services.embedding_service import Embedder
-from .cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from .cache_entry import CacheEntry 
 from .vector_store_services.vector_store_services import VectorStore
 from .query import QueryProcessor
-from .postgres_service.postgres_service import PostgresService, CacheEntryForPersistence
+from .postgres_service.postgres_service import PostgresService
 from .cache_invalidation.cache_invalidation_strategy import CacheInvalidationStrategy
 from .cache_eviction.cache_eviction_strategy import CacheEvictionStrategy
+from .metrics import CACHE_REQUESTS, CACHE_HITS, CACHE_MISSES, CACHE_BYPASSES, CACHE_LOOKUP_LATENCY, EMBEDDING_LATENCY, CACHE_INVALIDATIONS, CACHE_EVICTIONS, CACHE_SIZE
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +16,8 @@ class SemanticCaching:
     def __init__(self, 
                  llm_model: LLM, 
                  embedding_model: Embedder, 
-                 vector_store: VectorStore, 
+                 vector_store: VectorStore,
+                 cache_name : str = "default",
                  invalidation_strategy : CacheInvalidationStrategy | None = None,
                  eviction_strategy : CacheEvictionStrategy | None = None, 
                  query_processor : QueryProcessor = None, 
@@ -22,12 +25,14 @@ class SemanticCaching:
                  namespace : str = "default", 
                  postgres : PostgresService | None = None):
        
+
         self.llm = llm_model
         self.embedding = embedding_model
         self.threshold = threshold
         self.vector_store = vector_store
         self.query_processor = query_processor
         self.postgres = postgres
+        self.cache_name = cache_name
         self.invalidation_strategy = invalidation_strategy
         self.eviction_strategy = eviction_strategy
         
@@ -42,18 +47,10 @@ class SemanticCaching:
                                           embedding_dimension=int(self.embedding.embedding_dimension), 
                                           namespace=self.namespace, 
                                           limit=limit)
-        top_entries_transformed = [CacheEntryForRetrieval(
-                                                        question=entry.question,
-                                                        embedding=entry.embedding,
-                                                        answer=entry.answer,
-                                                        namespace=entry.namespace,
-                                                        id=entry.id,
-                                                        created_at=entry.created_at,
-                                                        hit_count=entry.hit_count,
-                                                        last_hit_at=entry.last_hit_at,
-                                                        last_accessed_at=entry.last_accessed_at) for entry in top_entries]
-        for entry in top_entries_transformed:
+        
+        for entry in top_entries:
             await self.vector_store.add_entry(entry)
+        CACHE_SIZE.labels(cache=self.cache_name).set(await self.vector_store.get_size())
         logger.info("Loaded %d cache entries from PostgreSQL", len(top_entries))
         return len(top_entries)
     
@@ -65,12 +62,25 @@ class SemanticCaching:
         for entry in entries:
             should_invalidate = (await self.invalidation_strategy.should_invalidate_entry(entry))
             if should_invalidate:
+                entry.invalidated = True
+                if self.postgres:
+                    try:
+                        id = entry.id
+                        await self.postgres.mark_invalidated(id=id, strategy=self.invalidation_strategy.__class__.__name__)
+                    except Exception:
+                        logger.exception("Failed to update cache invalidation metrics")
                 await self.vector_store.delete_entry(entry.id)
                 invalidated_count += 1
                 logger.info(
                     "Invalidated cache entry %s",
                     entry.id
                 )
+        if invalidated_count > 0:
+            CACHE_INVALIDATIONS.labels(
+                strategy=self.invalidation_strategy.__class__.__name__,
+                cache=self.cache_name
+            ).inc(invalidated_count)
+        CACHE_SIZE.labels(cache=self.cache_name).set(await self.vector_store.get_size())
         return invalidated_count
     
     async def evict_entries(self, max_size: int) -> int:
@@ -91,6 +101,13 @@ class SemanticCaching:
         )
         evicted_count = 0
         for entry in entries_to_evict:
+            entry.evicted = True
+            if self.postgres:
+                try:
+                    id = entry.id
+                    await self.postgres.mark_evicted(id=id, strategy=self.eviction_strategy.__class__.__name__)
+                except Exception:
+                    logger.exception("Failed to update cache eviction metrics")
             deleted = await self.vector_store.delete_entry(entry.id)
             if deleted:
                 evicted_count += 1
@@ -100,10 +117,18 @@ class SemanticCaching:
         logger.info(
             "Cache eviction completed: %d entries evicted",evicted_count
         )
+        if evicted_count > 0:
+            CACHE_EVICTIONS.labels(
+                strategy=self.eviction_strategy.__class__.__name__,
+                cache=self.cache_name
+            ).inc(evicted_count)
+        CACHE_SIZE.labels(cache=self.cache_name).set(await self.vector_store.get_size())
         return evicted_count
     
     
     async def get_answers(self, query:str)->dict:
+        logger.info("Received query: %s", query)
+        CACHE_REQUESTS.labels(cache=self.cache_name).inc()
         spans = []
         if self.query_processor is not None:
             logger.info("Query sent to Presidio Analyzer...")
@@ -119,43 +144,44 @@ class SemanticCaching:
                         query[span["start"]:span["end"]],
                         )
             logger.info("No sensitive information discovered!")
+            embedding_start = time.perf_counter()
             embedded = await self.embedding.embed(query)
+            EMBEDDING_LATENCY.labels(cache=self.cache_name).observe(time.perf_counter() - embedding_start)
             logger.info("Query embedded")
-            response_from_vector_store = await self.vector_store.search(query_embedding=embedded, threshold=self.threshold, namespace=self.namespace)
+            lookup_start = time.perf_counter()
+            response_from_vector_store = await self.vector_store.search(query_embedding=embedded, 
+                                                                        threshold=self.threshold, 
+                                                                        namespace=self.namespace)
+            CACHE_LOOKUP_LATENCY.labels(cache=self.cache_name).observe(time.perf_counter() - lookup_start)
             logger.info("Lookup finished")
             if response_from_vector_store == None:
+                CACHE_MISSES.labels(cache=self.cache_name).inc()
                 logger.info("No approprite match, generating answer")
                 answer_by_llm = await self.llm.generate(query=query)
                 logger.info("Answer generated by LLM")
-                entry_retrieval = CacheEntryForRetrieval(question=query,
-                                               embedding=embedded, 
-                                               answer=answer_by_llm, 
-                                               namespace=self.namespace,
-                                               hit_count=1)
+                entry = CacheEntry(question=query,
+                                    embedding=embedded, 
+                                    answer=answer_by_llm, 
+                                    namespace=self.namespace,
+                                    hit_count=1,
+                                    embedding_model=self.embedding.model_name,
+                                    embedding_dimension=int(self.embedding.embedding_dimension),)
                 logger.info("Entry being added to cache")
-                await self.vector_store.add_entry(entry_retrieval)
-                if self.postgres:
+                await self.vector_store.add_entry(entry)
+                CACHE_SIZE.labels(cache=self.cache_name).set(await self.vector_store.get_size())
+                if self.postgres:                
                     try: 
-                        entry_persistent = CacheEntryForPersistence(
-                            question=query,
-                            embedding=embedded,
-                            answer=answer_by_llm,
-                            embedding_model=self.embedding.model_name,
-                            embedding_dimension=int(self.embedding.embedding_dimension),
-                            namespace=self.namespace,
-                            id=entry_retrieval.id,
-                            hit_count=entry_retrieval.hit_count,
-                        )
-                        await self.postgres.save_entry(entry_persistent)
+                        await self.postgres.save_entry(entry)
                     except Exception:
                         logger.exception("Failed to persist cache entry to PostgreSQL")
                 return {
                     "cache_hit" : False,
                     "cosine_distance" : None,
                     "answer" : answer_by_llm,
-                    "time" : entry_retrieval.created_at            
+                    "time" : entry.created_at            
                 }
             else:
+                CACHE_HITS.labels(cache=self.cache_name).inc()
                 logger.info("Good match was found, retrieving from Store")
                 await self.vector_store.update_access_metadata(identifier=response_from_vector_store.identifier)
                 if self.postgres:
@@ -173,20 +199,21 @@ class SemanticCaching:
                     "id" : response_from_vector_store.identifier,
                 }
         else:
-            logger.info("PII discovered, send to LLM directly")
-            answer_by_llm = await self.llm.generate(query=query)
+            CACHE_BYPASSES.labels(cache=self.cache_name).inc()
             redacted_query = self.query_processor.redact(query = query, analyzer_results=spans)
+            logger.info("PII discovered, bypassing cache and sending original query to LLM")
+            answer_by_llm = await self.llm.generate(query=query)
             if self.postgres:
                 try:
-                    entry_persistent = CacheEntryForPersistence(
+                    entry = CacheEntry(
                                             question=redacted_query,
                                             embedding=[0],
                                             answer=answer_by_llm,
                                             embedding_model= "None",
                                             embedding_dimension = 0,
-                                            namespace="None",
+                                            namespace="bypassed",
                                         )
-                    await self.postgres.save_entry(entry_persistent)
+                    await self.postgres.save_entry(entry)
                 except Exception:
                         logger.info("error in saving redacted stuff to postgres")
 

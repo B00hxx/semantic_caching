@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+import time
+from prometheus_client import Histogram
+from fastapi import FastAPI, Request
 from .lifespan import lifespan
 from .routes.chat import router as chat_router
 from .routes.redaction_rules import router as upload_router
@@ -7,8 +9,41 @@ from .routes.delete import router as delete_router
 from .routes.auth import router as auth_router
 from .routes.top_k_entries import router as postgres_router
 from .routes.get_all_hot_entries import router as hot_entries_router
+from prometheus_client import make_asgi_app
 
 app = FastAPI(lifespan=lifespan)
+
+RESPONSE_LATENCY = Histogram(
+    "semantic_cache_response_latency_seconds",
+    "End-to-end HTTP response latency",
+    ["method", "path", "status"],
+)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+
+@app.middleware("http")
+async def measure_response_latency(request: Request, call_next):
+    start = time.perf_counter()
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        RESPONSE_LATENCY.labels(
+            method=request.method,
+            path=request.url.path,
+            status="500",
+        ).observe(time.perf_counter() - start)
+        raise
+
+    RESPONSE_LATENCY.labels(
+        method=request.method,
+        path=request.url.path,
+        status=str(response.status_code),
+    ).observe(time.perf_counter() - start)
+
+    return response
 
 app.include_router(chat_router)
 app.include_router(upload_router)

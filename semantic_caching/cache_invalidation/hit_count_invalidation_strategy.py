@@ -1,5 +1,5 @@
 from .cache_invalidation_strategy import CacheInvalidationStrategy
-from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from ..cache_entry import CacheEntry
 
 
 class HitCountInvalidationStrategy(CacheInvalidationStrategy):
@@ -11,5 +11,5 @@ class HitCountInvalidationStrategy(CacheInvalidationStrategy):
             )
         self.min_hit_count = min_hit_count
 
-    async def should_invalidate_entry(self, entry: CacheEntryForRetrieval) -> bool:
+    async def should_invalidate_entry(self, entry: CacheEntry) -> bool:
         return entry.hit_count < self.min_hit_count

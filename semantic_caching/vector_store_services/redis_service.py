@@ -6,7 +6,7 @@ from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from .vector_store_services import VectorStore
 from .vector_search_result import VectorSearchResult
-from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from ..cache_entry import CacheEntry 
 from datetime import datetime, timezone
 
 class RedisService(VectorStore):
@@ -53,7 +53,7 @@ class RedisService(VectorStore):
         except Exception as e:
             print("INDEX CREATION LOG:", e)
 
-    async def add_entry(self, entry: CacheEntryForRetrieval) -> str:
+    async def add_entry(self, entry: CacheEntry) -> str:
         cache_id = f"{self.prefix}:{entry.id}"
         await self.client.hset(
         cache_id,
@@ -68,7 +68,6 @@ class RedisService(VectorStore):
             "last_accessed_at": (entry.last_accessed_at.isoformat() if entry.last_accessed_at else ""),
         }
     )
-        #await self.client.expire(cache_id, entry.ttl_seconds)
         return cache_id
     
     
@@ -91,6 +90,7 @@ class RedisService(VectorStore):
         if keys:
             await self.client.delete(*keys)
         return len(keys)
+    
     async def search(self, query_embedding: np.ndarray, threshold: float, namespace : str):
         query = (
             Query(
@@ -143,13 +143,13 @@ class RedisService(VectorStore):
         cache_id = f"{self.prefix}:{identifier}"
         return await self.client.delete(cache_id)
     
-    async def get_all_entries(self) -> list[CacheEntryForRetrieval]:
+    async def get_all_entries(self) -> list[CacheEntry]:
         entries = []
         async for key in self.client.scan_iter(match=f"{self.prefix}:*"):
             data = await self.client.hgetall(key)
             if not data:
                 continue
-            entry = CacheEntryForRetrieval(
+            entry = CacheEntry(
                 id=uuid.UUID(key.decode().split(":")[-1]),
                 question=data[b"question"].decode(),
                 embedding=np.frombuffer(

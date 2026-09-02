@@ -1,8 +1,8 @@
-# Semantic Caching, PostgreSQL Persistence & PII Redaction Middleware
+# Semantic Caching, PostgreSQL Observability & PII-Redacted Records
 
-A high-performance, privacy-first **Semantic Caching, PostgreSQL Persistence (`pgvector`) & PII Redaction Middleware** designed for Large Language Model (LLM) applications.
+A high-performance **Semantic Caching, PostgreSQL Observability (`pgvector`) & PII-Redacted Records Middleware** designed for Large Language Model (LLM) applications. Sensitive queries are sent to the LLM unredacted for answer accuracy; redaction applies to stored observability records and cache eligibility.
 
-This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (`pgvector`) Long-Term Persistence & Pre-warming**, **Multiple Cache Invalidation & Eviction Strategies (TTL, Inactivity, Hit-Count, LRU, LFU, FIFO)**, **Unified Model Gateway Routing (LiteLLM)**, **Automated PII Redaction with Dynamic Rule Hot-Reloading (Microsoft Presidio)**, **Local LLM & Embedding Inference (Ollama)**, **OAuth2 JWT Authentication**, and a **Benchmarking & Threshold Optimization Suite**.
+This middleware combines **Redis HNSW Vector Similarity Search**, **PostgreSQL (`pgvector`) Observability Storage & Cache Pre-warming**, **Multiple Cache Invalidation & Eviction Strategies (TTL, Inactivity, Hit-Count, LRU, LFU, FIFO)**, **Unified Model Gateway Routing (LiteLLM)**, **PII Detection and Redacted Observability with Dynamic Rule Hot-Reloading (Microsoft Presidio)**, **Local LLM & Embedding Inference (Ollama)**, **OAuth2 JWT Authentication**, and a **Benchmarking & Threshold Optimization Suite**.
 
 ---
 
@@ -30,11 +30,17 @@ Querying Large Language Models directly for recurring or semantically equivalent
 
 This middleware addresses these challenges through a unified multi-tiered architecture:
 
-1. **PII Detection & Anonymization**: Scans incoming queries using Presidio Analyzer. If sensitive entities are detected, the cache is bypassed to avoid leaking confidential data, and redacted prompts are stored.
+### PII and observability policy
+
+The project deliberately prioritizes answer accuracy for sensitive requests. Presidio detects sensitive entities, but the original query is sent to the LLM so the model has the complete context needed to answer accurately. Sensitive requests bypass semantic lookup and are never added to Redis. For observability, PostgreSQL receives the redacted query and the generated answer as an observation with `namespace = NULL`. Namespace-less observations are retained for analysis but are excluded from `get_top_entries()` and therefore cannot hydrate an active Redis cache.
+
+This policy means the configured LLM provider can see the original query. Production deployments must use a trusted provider, encrypted transport, restricted PostgreSQL access, retention controls, and log scrubbing. The redacted PostgreSQL record is not a substitute for provider-side privacy controls.
+
+1. **PII Detection & Redacted Observability**: Scans incoming queries using Presidio Analyzer. If sensitive entities are detected, the cache is bypassed, the original query is sent to the LLM for answer accuracy, and only a redacted observation is stored in PostgreSQL without a cache namespace. Namespace-less observations are excluded from cache hydration.
 2. **Dynamic PII Rule Hot-Reloading**: Uploads YAML pattern recognizers on the fly without service interruptions or container restarts.
 3. **High-Speed Semantic Search (Redis HNSW)**: Computes dense vector embeddings and queries Redis Stack using an HNSW index with Cosine distance metric.
 4. **Multi-Strategy Invalidation & Capacity Eviction**: Periodically purges stale entries using configurable invalidation strategies (TTL, Inactivity, and Hit-Count thresholds) and enforces vector store capacity limits through pluggable eviction strategies (LRU, LFU, FIFO).
-5. **Durable Persistence & Startup Pre-Warming (PostgreSQL `pgvector`)**: Stores cache entries, embeddings, and access analytics (`hit_count`, `last_hit_at`, `last_accessed_at`) in PostgreSQL 17, and pre-warms top-K hit entries into Redis during application startup.
+5. **Durable Observability & Startup Pre-Warming (PostgreSQL `pgvector`)**: Stores cache entries, redacted bypass observations, embeddings, and access analytics (`hit_count`, `last_hit_at`, `last_accessed_at`) in PostgreSQL 17. Only rows with a configured cache namespace are eligible for top-K Redis pre-warming; namespace-less observations remain available for later observability.
 6. **Unified Model Gateway (LiteLLM)**: Routes LLM inference and embeddings through a single proxy interface backed by Ollama or external providers.
 7. **OAuth2 JWT Authentication**: Secures administrative actions (cache clearing and rule uploads) with token-based access control.
 
@@ -98,16 +104,17 @@ This middleware addresses these challenges through a unified multi-tiered archit
 ## Key Features
 
 - **Asynchronous Semantic Caching**: Powered by Redis Stack using HNSW vector indexing (`FLOAT32`, Cosine distance metric) with namespace isolation.
-- **Persistent Database Layer (`pgvector`)**: Stores cache entries in PostgreSQL 17 for durability across restarts, tracking hit counts and timestamps (`hit_count`, `last_hit_at`, `last_accessed_at`), with startup pre-warming of top-K entries.
+- **Persistent Database Layer (`pgvector`)**: Stores cache entries and redacted PII observations in PostgreSQL 17 for observability. Cache rows use a namespace; PII-bypass observations use `namespace = NULL` and are never selected for Redis pre-warming. Hit counts and timestamps are retained for analysis.
 - **Flexible Cache Invalidation & Eviction Strategies**: Includes built-in strategies running on asynchronous background loops:
   - **TTL Invalidation**: Evicts entries exceeding maximum time-to-live.
   - **Inactivity Invalidation**: Evicts entries inactive beyond a specified idle duration.
   - **Hit Count Invalidation**: Evicts entries with insufficient hit counts.
   - **Capacity-Based Eviction (LRU, LFU, FIFO)**: Automatically prunes excess entries when the cache exceeds capacity limits (`max_size`), supporting Least Recently Used (LRU), Least Frequently Used (LFU), and First-In First-Out (FIFO) policies.
 - **Unified LiteLLM Gateway**: Proxies completions and embeddings across local models (Ollama) or external APIs via unified endpoints.
-- **Sensitive PII Data Detection & Redaction**: Automatically identifies sensitive entities (`PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IBAN_CODE`, `IP_ADDRESS`, `MEDICAL_LICENSE`, `EMPLOYEE_ID`, `CONFIDENTIAL_PROJECT`).
+- **Sensitive PII Data Detection & Redacted Observability**: Automatically identifies sensitive entities (`PERSON`, `EMAIL_ADDRESS`, `PHONE_NUMBER`, `CREDIT_CARD`, `IBAN_CODE`, `IP_ADDRESS`, `MEDICAL_LICENSE`, `EMPLOYEE_ID`, `CONFIDENTIAL_PROJECT`). The original query is sent to the LLM by design; the stored PostgreSQL observation contains the redacted query and no cache namespace.
 - **Dynamic Presidio Recognizer Reloading**: Uploads custom YAML regex recognizers with hot reload of the Presidio Analyzer without restarting containers.
 - **OAuth2 JWT Authentication**: Protects administrative endpoints with bcrypt password hashing and JSON Web Tokens.
+- Chat endpoints are intentionally unauthenticated for client access. Put them behind an application gateway, quota, rate limit, or network policy when deployment-level access control is required.
 - **Local Inference with Ollama**: Pre-configured with local models (`qwen2.5:0.5b` for generation and `qwen3-embedding:0.6b` for 1024-dimensional embeddings).
 - **Analytics & Cache Inspection**: Endpoints for inspecting Redis memory usage, vector counts, PostgreSQL top-K hit entries, and full cache dumps.
 - **Integrated Developer GUIs**: Includes **RedisInsight** (Redis GUI) and **PgAdmin4** (PostgreSQL GUI) out of the box.
@@ -326,6 +333,8 @@ Authenticates an administrator and generates a JWT Bearer token.
 
 ### 2. Semantic Caching & Chat Endpoints
 
+All `/chat/*` endpoints are intentionally public and do not require a JWT. Administrative, observability, cache-deletion, and custom-rule operations remain separate protected surfaces.
+
 #### Ask with TTL Invalidation & LRU Eviction (`POST /chat/ttl_cache`)
 Queries the semantic cache instance configured with a **Time-To-Live (TTL)** invalidation strategy (default: 60 seconds) and **Least Recently Used (LRU)** capacity eviction (`max_size=100`).
 - **Request Body**:
@@ -353,7 +362,7 @@ Queries the semantic cache instance configured with a **Time-To-Live (TTL)** inv
     "id": "lite_ttl:550e8400-e29b-41d4-a716-446655440000"
   }
   ```
-- **Response (PII Detected - Cache Bypassed)**:
+- **Response (PII Detected - Cache Bypassed)**: The original query is sent to the configured LLM so it can use the complete context. The query is not embedded or written to Redis. A redacted observation is written to PostgreSQL with `namespace = NULL`; this record is for observability only and is excluded from startup cache hydration.
   ```json
   {
     "cache_hit": false,
@@ -386,7 +395,7 @@ Returns memory usage and key count from the vector store.
   ```
 
 #### PostgreSQL Top-K Entries (`POST /stats/postgres_entries`)
-Fetches the top `k` most frequently matched cache entries recorded in PostgreSQL.
+Fetches the top `k` most frequently matched, namespaced cache entries recorded in PostgreSQL. Namespace-less redacted PII observations are retained for observability but are excluded from cache hydration and this cache-entry query.
 - **Request Body**:
   ```json
   {
@@ -571,7 +580,7 @@ recognizers:
         score: 0.90
 ```
 
-Uploading a rule automatically triggers the `/reload` endpoint on the Presidio Analyzer container, registering the new recognizers immediately.
+Uploading a rule automatically triggers the `/reload` endpoint on the Presidio Analyzer container, registering the new recognizers immediately. Treat this endpoint and all inspection endpoints as administrative operations and protect them with authentication before production exposure.
 
 ---
 

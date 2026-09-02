@@ -7,13 +7,18 @@ router = APIRouter(prefix="/delete",tags=["delete"])
 
 @router.delete("/cache")
 async def delete_cache(request: Request,current_user: User = Depends(get_current_admin)):
-    await request.app.state.lite_testing.vector_store.empty_database()
+    await request.app.state.ttl_cache.vector_store.empty_database()
+    await request.app.state.inactivity_cache.vector_store.empty_database()
+    await request.app.state.hit_count_cache.vector_store.empty_database()
+    await request.app.state.fifo_eviction_cache.vector_store.empty_database()
+    await request.app.state.lfu_eviction_cache.vector_store.empty_database()
+    await request.app.state.lru_eviction_cache.vector_store.empty_database()
     return {
         "message": "Cache deleted successfully."
     }
 
 @router.delete("/fake_cache")
-async def delete_cache(request: Request,current_user: User = Depends(get_current_admin)):
+async def delete_fake_cache(request: Request,current_user: User = Depends(get_current_admin)):
     await request.app.state.fake_testing.vector_store.empty_database()
     return {
         "message": "Fake Cache deleted successfully."

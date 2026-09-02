@@ -2,9 +2,9 @@ from semantic_caching.embedding_services.embedding_service import Embedder
 import numpy as np
 
 class FakeEmbedder(Embedder):
-    def __init__(self, model="fake_emb"):
-        self.model = model
-    
+    def __init__(self, model_name="fake_emb", embedding_dimension : int = 3):
+        self.model_name = model_name
+        self.embedding_dimension = embedding_dimension
     async def embed(self, query: str) -> np.ndarray:
         query_lower = query.lower().strip()
         embedding_map = {

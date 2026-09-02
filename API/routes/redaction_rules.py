@@ -2,7 +2,8 @@ import os
 import re
 import yaml
 from pathlib import Path
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from API.auth.security import User, get_current_admin
 from config import settings
 from semantic_caching.presidio_analyzer.prisidio_reload_service import reload_presidio_analyzer
 router = APIRouter(prefix='/rules', tags=["rules"])
@@ -10,7 +11,7 @@ router = APIRouter(prefix='/rules', tags=["rules"])
 MAX_FILE_SIZE = 1 * 1024 * 1024
 
 @router.post("/upload-redaction-rules")
-async def upload_redaction_rules(file: UploadFile = File(...)):
+async def upload_redaction_rules(file: UploadFile = File(...), current_user: User = Depends(get_current_admin)):
     name = os.path.basename(file.filename)
 
     if not re.fullmatch(r"[A-Za-z0-9._-]+", name):

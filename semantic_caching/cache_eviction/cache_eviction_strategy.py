@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
-
-from ..cache_entry.cache_entry_retrieval import CacheEntryForRetrieval
+from ..cache_entry import CacheEntry
 
 
 class CacheEvictionStrategy(ABC):
-
     @abstractmethod
-    async def select_entries_for_eviction(self, entries: list[CacheEntryForRetrieval], number_to_evict: int) -> list[CacheEntryForRetrieval]:
+    async def select_entries_for_eviction(self, entries: list[CacheEntry], number_to_evict: int) -> list[CacheEntry]:
         """
         Select entries that should be evicted from the cache.
 
