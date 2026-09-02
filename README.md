@@ -376,6 +376,30 @@ python visualizations/visualize_results.py
 
 The repository includes charts for performance versus threshold, F1, precision/recall tradeoff, and confusion-matrix counts.
 
+#### Performance across thresholds
+
+![Semantic cache performance versus similarity threshold](threshold_tuning/results_2/performance_vs_threshold.png)
+
+This view compares accuracy, precision, recall, and F1 as the similarity threshold increases.
+
+#### F1 optimization
+
+![F1 score versus similarity threshold](threshold_tuning/results_2/f1_vs_threshold.png)
+
+The best F1 score in the evaluated results is 68.26% at a similarity threshold of 0.80.
+
+#### Precision and recall tradeoff
+
+![Precision recall tradeoff across similarity thresholds](threshold_tuning/results_2/precision_recall_tradeoff.png)
+
+Higher thresholds improve precision but reduce recall, making the choice dependent on the cost of false-positive cache matches versus missed matches.
+
+#### Confusion matrix by threshold
+
+![Confusion matrix counts versus similarity threshold](threshold_tuning/results_2/confusion_matrix_vs_threshold.png)
+
+This chart shows how true positives, false positives, true negatives, and false negatives change across the tested thresholds.
+
 ## Testing
 
 Pytest uses the repository root as `pythonpath`, searches under `testing`, and discovers `test_*.py` files and `test_*` functions.
