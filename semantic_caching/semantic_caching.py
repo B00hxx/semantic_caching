@@ -213,7 +213,7 @@ class SemanticCaching:
                                             embedding_dimension = 0,
                                             namespace="bypassed",
                                         )
-                    await self.postgres.save_entry(entry)
+                    await self.postgres.save_entry(redacted_query)
                 except Exception:
                         logger.info("error in saving redacted stuff to postgres")
 
