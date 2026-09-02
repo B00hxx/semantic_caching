@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS cache_entries (
     id UUID PRIMARY KEY,
     question TEXT NOT NULL,
