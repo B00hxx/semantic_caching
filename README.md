@@ -598,9 +598,11 @@ The runner logs in using OAuth2 JWT credentials, processes question pairs sequen
 
 ### Similarity Threshold Optimization Results
 
-Evaluating similarity thresholds across cosine distance metrics determines the optimal balance between cache hit rate and semantic accuracy. The benchmark evaluated 10 threshold levels (from `0.50` to `0.95` with step `0.05`) on 10,000 question pairs.
+Evaluating cosine similarity thresholds determines the optimal balance between cache hit rate and semantic accuracy. The benchmark evaluated 10 threshold levels (from `0.50` to `0.95` with step `0.05`) on 10,000 question pairs.
 
 #### Threshold Evaluation Summary Table
+
+The cache threshold is a **cosine similarity** cutoff. A candidate is accepted when its similarity is at least the configured threshold (the Redis search implements the equivalent cosine-distance check `distance <= 1 - threshold`). Increasing the threshold makes cache matches more selective: it reduces false positives, but it can also reduce recall and increase false negatives.
 
 | Similarity Threshold | Accuracy (%) | Precision (%) | Recall (%) | F1 Score (%) | True Positives (TP) | False Positives (FP) | True Negatives (TN) | False Negatives (FN) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -609,16 +611,22 @@ Evaluating similarity thresholds across cosine distance metrics determines the o
 | 0.60 | 61.59% | 48.69% | 65.18% | 55.74% | 2,419 | 2,549 | 3,740 | 1,292 |
 | 0.65 | 64.31% | 51.52% | 65.00% | 57.48% | 2,412 | 2,270 | 4,019 | 1,299 |
 | 0.70 | 67.19% | 54.97% | 64.11% | 59.19% | 2,379 | 1,949 | 4,340 | 1,332 |
-| **0.75** | **71.60%** | **58.31%** | **82.35%** | **68.28%** | **3,056** | **2,185** | **4,104** | **655** |
+| 0.75 | 70.71% | 59.01% | 68.98% | 63.55% | 2,560 | 1,778 | 4,511 | 1,151 |
 | **0.80** | **74.38%** | **63.17%** | **74.24%** | **68.26%** | **2,755** | **1,606** | **4,683** | **956** |
-| **0.85** | **75.74%** | **69.95%** | **60.71%** | **65.00%** | **2,253** | **968** | **5,321** | **1,458** |
+| 0.85 | 75.74% | 69.95% | 60.71% | 65.00% | 2,253 | 968 | 5,321 | 1,458 |
 | 0.90 | 73.70% | 77.76% | 40.80% | 53.52% | 1,514 | 433 | 5,856 | 2,197 |
 | 0.95 | 68.82% | 87.67% | 18.59% | 30.68% | 690 | 97 | 6,192 | 3,021 |
 
-#### Key Analytical Takeaways:
-- **Peak F1 Score (Threshold 0.75 - 0.80)**: Threshold **0.75** achieves the highest F1 score (**68.28%**) with strong recall (**82.35%**), while threshold **0.80** provides an almost identical F1 score (**68.26%**) with significantly improved accuracy (**74.38%**) and precision (**63.17%**).
-- **Maximum Accuracy (Threshold 0.85)**: Threshold **0.85** achieves peak overall classification accuracy (**75.74%**) with precision rising to **69.95%**.
-- **High-Precision / Low-Risk Mode (Threshold 0.90 - 0.95)**: Threshold **0.95** reaches **87.67% precision** with only 97 false positives across the entire dataset, making it ideal for zero-tolerance or mission-critical enterprise caching.
+Accuracy measures all correct classifications. Precision measures how many accepted cache matches are true duplicates, while recall measures how many true duplicates are found. F1 is the harmonic mean of precision and recall, making it the primary metric for a balanced threshold. TP and TN are correct duplicate and non-duplicate classifications; FP represents an incorrect cache match, and FN represents a duplicate that the cache failed to match.
+
+#### Key Analytical Takeaways
+
+- **Recommended balanced threshold: `0.80`**. It produces the highest F1 score in the updated results (**68.26%**) and is the best balance between finding duplicate questions and avoiding incorrect cache hits. It also improves substantially over `0.75` in accuracy (**74.38%**) and precision (**63.17%**).
+- **Maximum accuracy: `0.85`**. This threshold reaches **75.74% accuracy** and **69.95% precision**, but recall falls to **60.71%**. Use it when avoiding false positives matters more than serving as many valid cache hits.
+- **High-recall alternative: `0.75`**. It reaches **68.98% recall** and **63.55% F1**, but allows more false positives than `0.80` (**1,778** versus **1,606**).
+- **High-precision mode: `0.95`**. It reaches **87.67% precision** with only **97 false positives**, but recall drops to **18.59%**, so most valid duplicate opportunities are missed.
+
+The application cache instances use `threshold=0.8`, which matches the recommended balanced operating point. This value is a benchmark-based default, not a universal constant: production deployments should retune it using representative queries and the relative cost of false-positive cache responses versus missed cache hits.
 
 ---
 
@@ -632,7 +640,7 @@ Tracks **Accuracy**, **Precision**, **Recall**, and **F1 Score** across similari
 ![Performance vs Threshold](threshold_tuning/results_2/performance_vs_threshold.png)
 
 #### 2. F1 Score Optimization Curve
-Highlights the peak F1 Score balance achieved at threshold **0.75** (68.28%):
+Highlights the peak F1 Score achieved at threshold **0.80** (68.26%):
 
 ![F1 Score vs Threshold](threshold_tuning/results_2/f1_vs_threshold.png)
 
