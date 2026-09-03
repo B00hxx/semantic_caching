@@ -1,0 +1,43 @@
+@startuml Query Processing Activity Diagram
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor white
+  BorderColor #333333
+  DiamondBackgroundColor #f5f5f5
+  DiamondBorderColor #333333
+  StartColor #2e7d32
+  EndColor #c62828
+}
+
+start
+:Receive query from API client;
+:Select configured cache instance;
+:Analyze query with Presidio;
+
+if (Sensitive data detected?) then (yes)
+  :Redact sensitive data\nfor observation;
+  :Send original query to LLM;
+  :Receive generated answer;
+  :Return answer with\ncache_bypassed = true;
+else (no)
+  :Create query embedding;
+  :Search Redis semantic cache\nusing threshold and namespace;
+
+  if (Similar cache entry found?) then (yes)
+    :Read cached answer;
+    :Update Redis access metadata;
+    :Increment PostgreSQL hit count;
+    :Return cached answer with\ncache_hit = true;
+  else (no)
+    :Send query to LLM;
+    :Receive generated answer;
+    :Create CacheEntry;
+    :Store entry in Redis;
+    :Persist entry in PostgreSQL;
+    :Return generated answer with\ncache_hit = false;
+  endif
+endif
+
+stop
+@enduml

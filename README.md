@@ -329,6 +329,44 @@ classDiagram
 The editable PlantUML source for this diagram is available at
 [`docs/class-diagram.puml`](docs/class-diagram.puml).
 
+### Activity Diagram: Query Processing
+
+```mermaid
+flowchart TD
+  Start((Start)) --> Receive[Receive query from API client]
+  Receive --> Select[Select configured cache instance]
+  Select --> Analyze[Analyze query with Presidio]
+  Analyze --> Sensitive{Sensitive data detected?}
+
+  Sensitive -->|Yes| Redact[Redact sensitive data for observation]
+  Redact --> SensitiveLLM[Send original query to LLM]
+  SensitiveLLM --> SensitiveAnswer[Receive generated answer]
+  SensitiveAnswer --> BypassResponse[Return answer with cache_bypassed = true]
+
+  Sensitive -->|No| Embed[Create query embedding]
+  Embed --> Search[Search Redis semantic cache using threshold and namespace]
+  Search --> Hit{Similar cache entry found?}
+
+  Hit -->|Yes| Read[Read cached answer]
+  Read --> Access[Update Redis access metadata]
+  Access --> HitCount[Increment PostgreSQL hit count]
+  HitCount --> HitResponse[Return cached answer with cache_hit = true]
+
+  Hit -->|No| MissLLM[Send query to LLM]
+  MissLLM --> MissAnswer[Receive generated answer]
+  MissAnswer --> Entry[Create CacheEntry]
+  Entry --> Redis[Store entry in Redis]
+  Redis --> Persist[Persist entry in PostgreSQL]
+  Persist --> MissResponse[Return generated answer with cache_hit = false]
+
+  BypassResponse --> End((End))
+  HitResponse --> End
+  MissResponse --> End
+```
+
+The editable PlantUML source for this diagram is available at
+[`docs/activity-diagram-query-processing.puml`](docs/activity-diagram-query-processing.puml).
+
 The FastAPI application is created in [API/app.py](API/app.py). Its lifespan in [API/lifespan.py](API/lifespan.py) creates the Redis services, PostgreSQL pool, query processor, LLM and embedding clients, cache policies, startup hydration, and background maintenance tasks.
 
 ## Features
