@@ -23,24 +23,79 @@ The application keeps separate cache instances for different invalidation and ev
 
 ## Architecture
 
-```text
-Client
-  |
-  v
-FastAPI (/chat, /stats, /delete, /rules, /auth)
-  |
-  +--> Presidio Analyzer --> sensitive? --yes--> original query to LLM
-  |                                      |         (no Redis lookup)
-  |                                      +-------> redacted observation attempt
-  |
-  +--> LiteLLM embedding --> Redis Stack HNSW --> hit: cached answer
-  |                                           \--> miss: LiteLLM LLM
-  |                                                        |
-  +<-------------------------------------------------------+
-  |
-  +--> PostgreSQL/pgvector persistence and startup pre-warming
-  +--> Prometheus metrics
+```mermaid
+flowchart LR
+  Client[Client]
+
+  subgraph Request[Request Plane]
+    API[FastAPI API]
+    Routes[Chat and admin routes]
+    Pipeline[Semantic caching pipeline]
+    Privacy{Sensitive data?}
+    Lookup{Semantic cache match?}
+    Hit[Return cached answer]
+    Miss[Generate and cache answer]
+    Bypass[Generate answer without cache lookup]
+  end
+
+  subgraph Services[Privacy and Model Services]
+    Analyzer[Presidio Analyzer]
+    Anonymizer[Presidio Anonymizer]
+    Embeddings[LiteLLM Embedding API]
+    Generation[LiteLLM LLM API]
+    Ollama[Ollama model server]
+  end
+
+  subgraph Storage[Cache and Persistence]
+    Redis[(Redis Stack HNSW)]
+    Postgres[(PostgreSQL pgvector)]
+    Policies[Six cache namespaces\nTTL | inactivity | hit-count\nFIFO | LFU | LRU]
+  end
+
+  subgraph Operations[Operations]
+    Metrics[FastAPI Prometheus metrics]
+    Prometheus[Prometheus]
+    Grafana[Grafana]
+    Maintenance[Startup hydration\nand background maintenance]
+  end
+
+  Client -->|HTTP| API
+  API --> Routes
+  Routes --> Pipeline
+  Pipeline --> Privacy
+  Privacy -->|analyze| Analyzer
+  Privacy -->|sensitive| Bypass
+  Privacy -->|clean| Embeddings
+  Bypass -->|original query| Generation
+  Bypass -->|redacted observation| Anonymizer
+  Embeddings --> Lookup
+  Lookup -->|hit| Hit
+  Lookup -->|miss| Miss
+  Lookup <-->|vector search| Redis
+  Miss -->|query| Generation
+  Miss -->|new entry| Redis
+  Miss -->|durable entry| Postgres
+  Hit --> API
+  Bypass --> API
+  Miss --> API
+  Generation --> Ollama
+  Pipeline --> Policies
+  Policies --> Redis
+  Maintenance -->|pre-warm| Postgres
+  Maintenance -->|invalidate and evict| Policies
+  Prometheus -->|scrape| Metrics
+  Grafana -->|query| Prometheus
+  API -->|expose /metrics| Metrics
+
+  classDef boundary fill:#eef5ff,stroke:#4472c4,color:#1f2937
+  classDef decision fill:#fff4d6,stroke:#b7791f,color:#1f2937
+  classDef store fill:#e8f5e9,stroke:#398439,color:#1f2937
+  class Request,Services,Storage,Operations boundary
+  class Privacy,Lookup decision
+  class Redis,Postgres,Policies store
 ```
+
+The main request path is privacy-first: sensitive queries go directly to the LLM, while clean queries are embedded and searched against the selected Redis namespace. Cache misses generate an answer and persist a new entry; startup hydration and background policies keep Redis aligned with PostgreSQL and configured limits.
 
 ### Use Case Diagram
 
