@@ -221,6 +221,114 @@ sequenceDiagram
 The editable PlantUML source for this diagram is available at
 [`docs/sequence-diagram-cache-hit-miss.puml`](docs/sequence-diagram-cache-hit-miss.puml).
 
+### Class Diagram
+
+```mermaid
+classDiagram
+  class SemanticCaching {
+    -LLM llm
+    -Embedder embedding
+    -VectorStore vector_store
+    -QueryProcessor query_processor
+    -PostgresService postgres
+    -CacheInvalidationStrategy invalidation_strategy
+    -CacheEvictionStrategy eviction_strategy
+    -float threshold
+    -str namespace
+    +initialize(limit) int
+    +get_answers(query) dict
+    +invalidate_entries() int
+    +evict_entries(max_size) int
+  }
+
+  class CacheEntry {
+    +UUID id
+    +str question
+    +str answer
+    +list~float~ embedding
+    +str namespace
+    +int hit_count
+    +bool evicted
+    +bool invalidated
+  }
+
+  class QueryProcessor {
+    +process(query) list
+    +contains_sensitive_data(spans) bool
+    +redact(query, analyzer_results) str
+  }
+
+  class LLM {
+    <<interface>>
+    +generate(query) str
+  }
+
+  class Embedder {
+    <<interface>>
+    +str model_name
+    +int embedding_dimension
+    +embed(query) list
+  }
+
+  class VectorStore {
+    <<interface>>
+    +add_entry(entry)
+    +search(query_embedding, threshold, namespace)
+    +update_access_metadata(identifier)
+    +get_all_entries() list
+    +delete_entry(identifier)
+    +get_size() int
+  }
+
+  class CacheInvalidationStrategy {
+    <<interface>>
+    +should_invalidate_entry(entry) bool
+  }
+
+  class CacheEvictionStrategy {
+    <<interface>>
+    +select_entries_for_eviction(entries, number_to_evict) list
+  }
+
+  class LiteLLMService
+  class FakeLLMToDeploy
+  class LiteLLMEmbedder
+  class RedisService
+  class PostgresService
+  class TTLInvalidationStrategy
+  class InactivityInvalidationStrategy
+  class HitCountInvalidationStrategy
+  class FIFOEvictionStrategy
+  class LFUEvictionStrategy
+  class LRUEvictionStrategy
+
+  SemanticCaching *-- CacheEntry : creates
+  SemanticCaching o-- LLM
+  SemanticCaching o-- Embedder
+  SemanticCaching o-- VectorStore
+  SemanticCaching o-- QueryProcessor
+  SemanticCaching o-- CacheInvalidationStrategy
+  SemanticCaching o-- CacheEvictionStrategy
+  SemanticCaching o-- PostgresService
+  VectorStore ..> CacheEntry : stores and returns
+  CacheInvalidationStrategy ..> CacheEntry : evaluates
+  CacheEvictionStrategy ..> CacheEntry : selects
+
+  LiteLLMService ..|> LLM
+  FakeLLMToDeploy ..|> LLM
+  LiteLLMEmbedder ..|> Embedder
+  RedisService ..|> VectorStore
+  TTLInvalidationStrategy ..|> CacheInvalidationStrategy
+  InactivityInvalidationStrategy ..|> CacheInvalidationStrategy
+  HitCountInvalidationStrategy ..|> CacheInvalidationStrategy
+  FIFOEvictionStrategy ..|> CacheEvictionStrategy
+  LFUEvictionStrategy ..|> CacheEvictionStrategy
+  LRUEvictionStrategy ..|> CacheEvictionStrategy
+```
+
+The editable PlantUML source for this diagram is available at
+[`docs/class-diagram.puml`](docs/class-diagram.puml).
+
 The FastAPI application is created in [API/app.py](API/app.py). Its lifespan in [API/lifespan.py](API/lifespan.py) creates the Redis services, PostgreSQL pool, query processor, LLM and embedding clients, cache policies, startup hydration, and background maintenance tasks.
 
 ## Features

@@ -1,0 +1,119 @@
+@startuml Semantic Caching Class Diagram
+
+left to right direction
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+package "Core Domain" {
+  class SemanticCaching {
+    - llm: LLM
+    - embedding: Embedder
+    - vector_store: VectorStore
+    - query_processor: QueryProcessor
+    - postgres: PostgresService
+    - invalidation_strategy: CacheInvalidationStrategy
+    - eviction_strategy: CacheEvictionStrategy
+    - threshold: float
+    - namespace: str
+    + initialize(limit: int): int
+    + get_answers(query: str): dict
+    + invalidate_entries(): int
+    + evict_entries(max_size: int): int
+  }
+
+  class CacheEntry {
+    + id: UUID
+    + question: str
+    + answer: str
+    + embedding: list[float]
+    + namespace: str
+    + embedding_model: str
+    + embedding_dimension: int
+    + created_at: datetime
+    + hit_count: int
+    + last_hit_at: datetime
+    + last_accessed_at: datetime
+    + evicted: bool
+    + invalidated: bool
+  }
+
+  class QueryProcessor {
+    + process(query: str): list
+    + contains_sensitive_data(spans: list): bool
+    + redact(query: str, analyzer_results: list): str
+  }
+}
+
+package "Service Interfaces" {
+  interface LLM {
+    + generate(query: str): str
+  }
+
+  interface Embedder {
+    + model_name: str
+    + embedding_dimension: int
+    + embed(query: str): list[float]
+  }
+
+  interface VectorStore {
+    + add_entry(entry: CacheEntry)
+    + search(query_embedding, threshold, namespace): VectorSearchResult
+    + update_access_metadata(identifier: str)
+    + get_all_entries(): list[CacheEntry]
+    + delete_entry(identifier: UUID)
+    + get_size(): int
+    + empty_database()
+  }
+
+  interface CacheInvalidationStrategy {
+    + should_invalidate_entry(entry: CacheEntry): bool
+  }
+
+  interface CacheEvictionStrategy {
+    + select_entries_for_eviction(entries, number_to_evict): list[CacheEntry]
+  }
+}
+
+package "Implementations" {
+  class LiteLLMService
+  class FakeLLMToDeploy
+  class LiteLLMEmbedder
+  class RedisService
+  class TTLInvalidationStrategy
+  class InactivityInvalidationStrategy
+  class HitCountInvalidationStrategy
+  class FIFOEvictionStrategy
+  class LFUEvictionStrategy
+  class LRUEvictionStrategy
+  class PostgresService
+}
+
+SemanticCaching *-- CacheEntry : creates
+SemanticCaching o-- LLM
+SemanticCaching o-- Embedder
+SemanticCaching o-- VectorStore
+SemanticCaching o-- QueryProcessor
+SemanticCaching o-- CacheInvalidationStrategy
+SemanticCaching o-- CacheEvictionStrategy
+SemanticCaching o-- PostgresService
+VectorStore ..> CacheEntry : stores / returns
+CacheInvalidationStrategy ..> CacheEntry : evaluates
+CacheEvictionStrategy ..> CacheEntry : selects
+
+LiteLLMService ..|> LLM
+FakeLLMToDeploy ..|> LLM
+LiteLLMEmbedder ..|> Embedder
+RedisService ..|> VectorStore
+TTLInvalidationStrategy ..|> CacheInvalidationStrategy
+InactivityInvalidationStrategy ..|> CacheInvalidationStrategy
+HitCountInvalidationStrategy ..|> CacheInvalidationStrategy
+FIFOEvictionStrategy ..|> CacheEvictionStrategy
+LFUEvictionStrategy ..|> CacheEvictionStrategy
+LRUEvictionStrategy ..|> CacheEvictionStrategy
+
+note right of SemanticCaching
+  One instance is created for each
+  configured cache namespace.
+end note
+
+@enduml
