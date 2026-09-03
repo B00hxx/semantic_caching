@@ -376,7 +376,7 @@ This loads at most 100 queries from `benchmark/datasets/lmsys-chat-1m` and evalu
 
 The cache has a clear latency effect: successful cache hits take about 1.5 to 1.8 seconds on average, while misses take about 23 to 75 seconds. Hit Count performed best overall in this run because it had the highest hit rate, 33%, and the lowest mean miss latency, 22.985 seconds. TTL had a similar hit rate to Inactivity but lower miss latency. Inactivity shows the largest relative speedup on a hit, 41.0x, although its misses were the slowest on average and at p95.
 
-The TTL analysis contains 99 parsed requests even though the benchmark was configured for 100 queries; this is retained as recorded in `results.txt` and should be checked before treating the policy results as a strict equal-sample comparison. Mean speedup is calculated as `miss mean / hit mean`; p95 is the 95th percentile latency.
+Mean speedup is calculated as `miss mean / hit mean`; p95 is the 95th percentile latency.
 
 ### Threshold results
 
