@@ -378,6 +378,21 @@ The cache has a clear latency effect: successful cache hits take about 1.5 to 1.
 
 The TTL analysis contains 99 parsed requests even though the benchmark was configured for 100 queries; this is retained as recorded in `results.txt` and should be checked before treating the policy results as a strict equal-sample comparison. Mean speedup is calculated as `miss mean / hit mean`; p95 is the 95th percentile latency.
 
+#### Estimated savings
+
+The request log can also provide hit counts, hit rates, and an approximate latency saving. The estimate uses the p50 miss latency as the uncached LLM baseline and the p50 hit latency as the cache baseline:
+
+$$
+	ext{latency\_saved} \approx \text{hits} \times (\text{p50 miss latency} - \text{p50 hit latency})
+$$
+
+| Policy | Requests | Hits | Hit rate | Hit p50 | Miss p50 | Estimated latency saved |
+|---|---:|---:|---:|---:|---:|---:|
+| TTL | 100 | 19 | 19% | 1.022s | 35.199s | 649.4s (10.8 min) |
+| Inactivity | 100 | 19 | 19% | 1.693s | 52.497s | 965.3s (16.1 min) |
+| Hit Count | 100 | 33 | 33% | 1.403s | 15.698s | 471.7s (7.9 min) |
+
+The TTL request summary reports 100 requests and 19 hits, but query 1's request-level line is absent from the log excerpt; its p50 latency values therefore use the 99 visible request lines. These latency savings are estimates because the log does not record the uncached LLM latency that each individual hit would have incurred.
 ### Threshold results
 
 Stored results and charts are under `threshold_tuning/` and `visualizations/`. The included evaluation covers thresholds `0.50` through `0.95` in `0.05` increments. The application's production caches use `0.8`, the documented balanced operating point in the stored results. Regenerate charts with:
