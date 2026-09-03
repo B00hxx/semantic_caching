@@ -42,6 +42,74 @@ FastAPI (/chat, /stats, /delete, /rules, /auth)
   +--> Prometheus metrics
 ```
 
+### Use Case Diagram
+
+```mermaid
+flowchart LR
+    Client[API Client]
+    Admin[Administrator]
+    Benchmark[Benchmark Runner]
+    Monitoring[Prometheus / Grafana]
+
+    subgraph Pipeline[Semantic Caching Pipeline]
+        Submit[Submit query]
+        Policy[Select cache policy]
+        Analyze[Analyze query for sensitive data]
+        Embed[Create embedding]
+        Search[Search semantic cache]
+        Hit[Return cached answer]
+        Miss[Generate answer for cache miss]
+        Sensitive[Generate answer for sensitive query]
+        Store[Store generated answer in cache]
+        Persist[Persist cache entry to PostgreSQL]
+        Redact[Redact sensitive data for observation]
+
+        Login[Authenticate as admin]
+        Stats[Inspect cache statistics]
+        Hot[List hot cache entries]
+        Top[Query top PostgreSQL entries]
+        Delete[Delete cache contents]
+        Rules[Upload redaction rules]
+        Reload[Reload analyzer rules]
+        Metrics[Collect and query application metrics]
+        Run[Run cache benchmark]
+    end
+
+    Client --> Submit
+    Client --> Policy
+    Benchmark --> Run
+    Run --> Submit
+    Monitoring --> Metrics
+    Admin --> Login
+
+    Submit --> Policy
+    Submit --> Analyze
+    Submit --> Metrics
+    Analyze -->|no sensitive data| Embed
+    Embed --> Search
+    Search -->|similar entry found| Hit
+    Search -->|cache miss| Miss
+    Miss --> Store
+    Store --> Persist
+    Analyze -->|sensitive data detected| Redact
+    Analyze -->|sensitive data detected| Sensitive
+
+    Admin --> Stats
+    Admin --> Hot
+    Admin --> Top
+    Admin --> Delete
+    Admin --> Rules
+    Stats --> Login
+    Hot --> Login
+    Top --> Login
+    Delete --> Login
+    Rules --> Login
+    Rules --> Reload
+```
+
+The editable PlantUML source for this diagram is available at
+[`docs/use-case-diagram.puml`](docs/use-case-diagram.puml).
+
 The FastAPI application is created in [API/app.py](API/app.py). Its lifespan in [API/lifespan.py](API/lifespan.py) creates the Redis services, PostgreSQL pool, query processor, LLM and embedding clients, cache policies, startup hydration, and background maintenance tasks.
 
 ## Features

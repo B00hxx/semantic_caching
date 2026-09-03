@@ -1,0 +1,86 @@
+@startuml Semantic Caching Pipeline Use Cases
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "API Client" as Client
+actor "Administrator" as Admin
+actor "Benchmark Runner" as Benchmark
+actor "Prometheus / Grafana" as Monitoring
+
+rectangle "Semantic Caching Pipeline" {
+  usecase "Submit query" as SubmitQuery
+  usecase "Select cache policy" as SelectPolicy
+  usecase "Analyze query for\nsensitive data" as AnalyzeQuery
+  usecase "Redact sensitive data\nfor observation" as RedactData
+  usecase "Generate answer for\ncache miss" as GenerateMissAnswer
+  usecase "Generate answer for\nsensitive query" as GenerateSensitiveAnswer
+  usecase "Create embedding" as CreateEmbedding
+  usecase "Search semantic cache" as SearchCache
+  usecase "Return cached answer" as ReturnHit
+  usecase "Store generated answer\nin cache" as StoreAnswer
+  usecase "Persist cache entry\nto PostgreSQL" as PersistEntry
+  usecase "Bypass cache for\nsensitive query" as BypassCache
+
+  usecase "Authenticate as admin" as Authenticate
+  usecase "Inspect cache statistics" as InspectStats
+  usecase "List hot cache entries" as ListHotEntries
+  usecase "Query top PostgreSQL\nentries" as QueryTopEntries
+  usecase "Delete cache contents" as DeleteCache
+  usecase "Upload redaction rules" as UploadRules
+  usecase "Reload analyzer rules" as ReloadRules
+
+  usecase "Collect and query\napplication metrics" as CollectMetrics
+  usecase "Run cache benchmark" as RunBenchmark
+}
+
+Client --> SubmitQuery
+Client --> SelectPolicy
+Benchmark --> RunBenchmark
+Benchmark --> SubmitQuery
+Monitoring --> CollectMetrics
+Admin --> Authenticate
+
+SubmitQuery ..> SelectPolicy : <<include>>
+SubmitQuery ..> AnalyzeQuery : <<include>>
+SubmitQuery ..> CollectMetrics : <<include>>
+
+AnalyzeQuery <.. RedactData : <<extend>>\n[sensitive data detected]
+AnalyzeQuery <.. BypassCache : <<extend>>\n[sensitive data detected]
+BypassCache ..> GenerateSensitiveAnswer : <<include>>
+
+AnalyzeQuery <.. CreateEmbedding : <<extend>>\n[no sensitive data]
+CreateEmbedding ..> SearchCache : <<include>>
+SearchCache <.. ReturnHit : <<extend>>\n[similar entry found]
+SearchCache <.. GenerateMissAnswer : <<extend>>\n[cache miss]
+GenerateMissAnswer ..> StoreAnswer : <<include>>
+StoreAnswer ..> PersistEntry : <<include>>
+
+InspectStats ..> Authenticate : <<include>>
+ListHotEntries ..> Authenticate : <<include>>
+QueryTopEntries ..> Authenticate : <<include>>
+DeleteCache ..> Authenticate : <<include>>
+UploadRules ..> Authenticate : <<include>>
+UploadRules ..> ReloadRules : <<include>>
+
+Admin --> InspectStats
+Admin --> ListHotEntries
+Admin --> QueryTopEntries
+Admin --> DeleteCache
+Admin --> UploadRules
+
+note right of SelectPolicy
+  Available policies:
+  TTL, inactivity, hit-count,
+  FIFO, LFU, and LRU caches
+end note
+
+note bottom of CollectMetrics
+  Metrics cover requests, hits, misses,
+  bypasses, latency, invalidation,
+  eviction, and cache size.
+end note
+
+@enduml
