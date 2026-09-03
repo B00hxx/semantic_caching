@@ -49,7 +49,7 @@ flowchart LR
   subgraph Storage[Cache and Persistence]
     Redis[(Redis Stack HNSW)]
     Postgres[(PostgreSQL pgvector)]
-    Policies[Six cache namespaces\nTTL | inactivity | hit-count\nFIFO | LFU | LRU]
+    Policies[Six cache namespaces<br/>TTL, inactivity, hit-count<br/>FIFO, LFU, LRU]
   end
 
   subgraph Operations[Operations]
