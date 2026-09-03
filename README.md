@@ -160,6 +160,67 @@ flowchart LR
 The editable PlantUML source for this diagram is available at
 [`docs/component-diagram.puml`](docs/component-diagram.puml).
 
+### Sequence Diagram: Cache Hit / Cache Miss
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Client as API Client
+  participant API as FastAPI Chat Route
+  participant Cache as Semantic Caching Orchestrator
+  participant Query as Query Processor
+  participant Analyzer as Presidio Analyzer
+  participant Embedder as LiteLLM Embedding API
+  participant Redis as Redis Stack Vector Cache
+  participant LLM as LiteLLM LLM API
+  participant Postgres as PostgreSQL Persistence
+
+  Client->>API: POST /chat/{cache_policy}
+  activate API
+  API->>Cache: get_answers(query)
+  activate Cache
+  Cache->>Query: process(query)
+  activate Query
+  Query->>Analyzer: analyze(text)
+  Analyzer-->>Query: entity spans
+  Query-->>Cache: spans
+  deactivate Query
+
+  alt Sensitive data detected
+    Cache->>Query: redact(query, spans)
+    Query-->>Cache: redacted observation
+    Cache->>LLM: generate(original query)
+    LLM-->>Cache: answer
+    Cache-->>API: answer, cache_bypassed=true
+  else No sensitive data detected
+    Cache->>Embedder: embed(query)
+    Embedder-->>Cache: query embedding
+    Cache->>Redis: search(embedding, threshold, namespace)
+    alt Cache hit: similar entry found
+      Redis-->>Cache: cached answer and score
+      Cache->>Redis: update access metadata
+      Cache->>Postgres: increment hit count
+      Postgres-->>Cache: updated
+      Cache-->>API: cached answer, cache_hit=true
+    else Cache miss: no similar entry
+      Redis-->>Cache: no match
+      Cache->>LLM: generate(query)
+      LLM-->>Cache: answer
+      Cache->>Redis: add cache entry
+      Cache->>Postgres: save cache entry
+      Postgres-->>Cache: persisted
+      Cache-->>API: generated answer, cache_hit=false
+    end
+  end
+
+  deactivate Cache
+  API-->>Client: HTTP response
+  deactivate API
+```
+
+The editable PlantUML source for this diagram is available at
+[`docs/sequence-diagram-cache-hit-miss.puml`](docs/sequence-diagram-cache-hit-miss.puml).
+
 The FastAPI application is created in [API/app.py](API/app.py). Its lifespan in [API/lifespan.py](API/lifespan.py) creates the Redis services, PostgreSQL pool, query processor, LLM and embedding clients, cache policies, startup hydration, and background maintenance tasks.
 
 ## Features

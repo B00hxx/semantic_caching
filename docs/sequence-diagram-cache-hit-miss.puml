@@ -1,0 +1,60 @@
+@startuml Semantic Cache Hit and Miss Sequence
+
+autonumber
+skinparam shadowing false
+skinparam responseMessageBelowArrow true
+
+actor "API Client" as Client
+participant "FastAPI\nChat Route" as API
+participant "Semantic Caching\nOrchestrator" as Cache
+participant "Query Processor" as Query
+participant "Presidio Analyzer" as Analyzer
+participant "LiteLLM\nEmbedding API" as Embedder
+database "Redis Stack\nVector Cache" as Redis
+participant "LiteLLM\nLLM API" as LLM
+database "PostgreSQL\nPersistence" as Postgres
+
+Client -> API : POST /chat/{cache_policy}
+activate API
+API -> Cache : get_answers(query)
+activate Cache
+Cache -> Query : process(query)
+activate Query
+Query -> Analyzer : analyze(text)
+Analyzer --> Query : entity spans
+Query --> Cache : spans
+deactivate Query
+
+alt Sensitive data detected
+  Cache -> Query : redact(query, spans)
+  Query --> Cache : redacted observation
+  Cache -> LLM : generate(original query)
+  LLM --> Cache : answer
+  Cache --> API : answer, cache_bypassed=true
+else No sensitive data detected
+  Cache -> Embedder : embed(query)
+  Embedder --> Cache : query embedding
+  Cache -> Redis : search(embedding, threshold, namespace)
+
+  alt Cache hit: similar entry found
+    Redis --> Cache : cached answer + score
+    Cache -> Redis : update access metadata
+    Cache -> Postgres : increment hit count
+    Postgres --> Cache : updated
+    Cache --> API : cached answer, cache_hit=true
+  else Cache miss: no similar entry
+    Redis --> Cache : no match
+    Cache -> LLM : generate(query)
+    LLM --> Cache : answer
+    Cache -> Redis : add cache entry
+    Cache -> Postgres : save cache entry
+    Postgres --> Cache : persisted
+    Cache --> API : generated answer, cache_hit=false
+  end
+end
+
+deactivate Cache
+API --> Client : HTTP response
+deactivate API
+
+@enduml
