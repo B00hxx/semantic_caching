@@ -110,6 +110,56 @@ flowchart LR
 The editable PlantUML source for this diagram is available at
 [`docs/use-case-diagram.puml`](docs/use-case-diagram.puml).
 
+### Component Diagram
+
+```mermaid
+flowchart LR
+  Client[API Client]
+  Admin[Administrator]
+
+  subgraph FastAPI[FastAPI Application]
+    Routes[API Routes]
+    Auth[Authentication and Authorization]
+    Orchestrator[Semantic Caching Orchestrator]
+    Query[Query Processor]
+    Policies[Cache Policies]
+    Metrics[Prometheus Metrics]
+    Maintenance[Background Maintenance]
+  end
+
+  subgraph External[External Services]
+    Analyzer[Presidio Analyzer]
+    Anonymizer[Presidio Anonymizer]
+    LiteLLM[LiteLLM Proxy]
+    Ollama[Ollama]
+    Redis[(Redis Stack HNSW vector cache)]
+    Postgres[(PostgreSQL pgvector persistence)]
+    Prometheus[Prometheus]
+    Grafana[Grafana]
+  end
+
+  Client -->|HTTP chat requests| Routes
+  Admin -->|admin HTTP requests| Routes
+  Routes -->|protect admin routes| Auth
+  Routes -->|select cache instance| Orchestrator
+  Routes -->|expose /metrics| Metrics
+  Orchestrator -->|inspect query| Query
+  Query -->|analyze entities| Analyzer
+  Query -->|redact observation| Anonymizer
+  Orchestrator -->|invalidate and evict| Policies
+  Orchestrator -->|generate answer and embedding| LiteLLM
+  Orchestrator -->|search, read, and write| Redis
+  Orchestrator -->|persist and hydrate entries| Postgres
+  LiteLLM -->|model inference| Ollama
+  Maintenance -->|scheduled maintenance| Orchestrator
+  Maintenance -->|startup pre-warming| Postgres
+  Prometheus -->|scrape| Metrics
+  Grafana -->|query and visualize| Prometheus
+```
+
+The editable PlantUML source for this diagram is available at
+[`docs/component-diagram.puml`](docs/component-diagram.puml).
+
 The FastAPI application is created in [API/app.py](API/app.py). Its lifespan in [API/lifespan.py](API/lifespan.py) creates the Redis services, PostgreSQL pool, query processor, LLM and embedding clients, cache policies, startup hydration, and background maintenance tasks.
 
 ## Features

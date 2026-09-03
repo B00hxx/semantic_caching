@@ -1,0 +1,64 @@
+@startuml Semantic Caching Pipeline Components
+
+left to right direction
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "API Client" as Client
+actor "Administrator" as Admin
+
+package "FastAPI Application" {
+  component "API Routes" as Routes
+  component "Authentication\n& Authorization" as Auth
+  component "Semantic Caching\nOrchestrator" as Orchestrator
+  component "Query Processor" as QueryProcessor
+  component "Cache Policies" as Policies
+  component "Prometheus\nMetrics" as Metrics
+  component "Background\nMaintenance" as Maintenance
+}
+
+package "External Services" {
+  component "Presidio Analyzer" as Analyzer
+  component "Presidio Anonymizer" as Anonymizer
+  component "LiteLLM Proxy" as LiteLLM
+  component "Ollama" as Ollama
+  database "Redis Stack\n(HNSW vector cache)" as Redis
+  database "PostgreSQL\n(pgvector persistence)" as Postgres
+  component "Prometheus" as Prometheus
+  component "Grafana" as Grafana
+}
+
+Client --> Routes : HTTP chat requests
+Admin --> Routes : admin HTTP requests
+Routes --> Auth : protect admin routes
+Routes --> Orchestrator : select cache instance
+Routes --> Metrics : expose /metrics
+
+Orchestrator --> QueryProcessor : inspect query
+QueryProcessor --> Analyzer : analyze entities
+QueryProcessor --> Anonymizer : redact observation
+Orchestrator --> Policies : invalidate / evict
+Orchestrator --> LiteLLM : generate answer
+Orchestrator --> LiteLLM : create embedding
+Orchestrator --> Redis : search / read / write cache
+Orchestrator --> Postgres : persist / hydrate entries
+
+LiteLLM --> Ollama : model inference
+Maintenance --> Orchestrator : scheduled invalidation\nand eviction
+Maintenance --> Postgres : startup pre-warming
+Prometheus --> Metrics : scrape metrics
+Grafana --> Prometheus : query and visualize
+
+note right of Policies
+  Six independent cache instances:
+  TTL, inactivity, hit-count,
+  FIFO, LFU, and LRU.
+end note
+
+note bottom of Redis
+  Each cache instance uses a separate
+  namespace and Redis key prefix.
+end note
+
+@enduml
