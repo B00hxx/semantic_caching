@@ -5,19 +5,27 @@ from .workers.runner import WorkerRunner
 from .workers.dataset_loader import load_lmsys_queries
 
 
-logging.basicConfig(level=logging.INFO)
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
 DATASET_DIRECTORY = "benchmark/datasets/lmsys-chat-1m"
 
 MAX_QUERIES = 100
+WORKER_COUNT = 1
+REQUEST_TIMEOUT_SECONDS = 120
 
 ENDPOINTS = [
+    ("TTL", "http://127.0.0.1:8000/chat/ttl_cache"),
+    ("Inactivity", "http://127.0.0.1:8000/chat/inactivity_cache"),
     ("Hit Count", "http://127.0.0.1:8000/chat/hit_count_cache"),
+    ("FIFO Eviction", "http://127.0.0.1:8000/chat/fifo_eviction_cache"),
+    ("LFU Eviction", "http://127.0.0.1:8000/chat/lfu_eviction_cache"),
+    ("LRU Eviction", "http://127.0.0.1:8000/chat/lru_eviction_cache"),
 ]
-
 
 async def main():
 
@@ -38,6 +46,8 @@ async def main():
 
         runner = WorkerRunner(
             endpoint=endpoint,
+            worker_count=WORKER_COUNT,
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
 
         results = await runner.run(

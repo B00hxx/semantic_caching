@@ -4,9 +4,9 @@ from typing import Any, Dict
 
 
 class Worker:
-    def __init__(self, worker_id: int):
+    def __init__(self, worker_id: int, timeout: float = 120):
         self.worker_id = worker_id
-        self._client = httpx.AsyncClient(timeout=None, trust_env=False,)
+        self._client = httpx.AsyncClient(timeout=timeout, trust_env=False,)
 
     async def close(self) -> None:
         if self._client is not None:

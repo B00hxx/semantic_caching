@@ -76,8 +76,6 @@ async def lifespan(app : FastAPI):
     logger.info("LIFESPAN: Redis services created")
     
     query_processor = QueryProcessor()
-    postgres_service = await settings.postgres_service.get_service()
-
     logger.info("LIFESPAN: getting PostgreSQL service")
     postgres_service = await settings.postgres_service.get_service()
     logger.info("LIFESPAN: PostgreSQL service ready")

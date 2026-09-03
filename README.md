@@ -364,7 +364,19 @@ python -m benchmark.main
 python -m benchmark.run_workers
 ```
 
-This loads at most 100 queries from `benchmark/datasets/lmsys-chat-1m`, sends them to `/chat/hit_count_cache`, and reports successful requests, cache hits, and hit rate. The worker runner and dataset loader live under `benchmark/workers/`.
+This loads at most 100 queries from `benchmark/datasets/lmsys-chat-1m` and evaluates the cache endpoints sequentially with one worker. The worker runner and dataset loader live under `benchmark/workers/`. Each request records its status, cache-hit flag, and latency. The current run is summarized below; hit and miss latency statistics are calculated from the successful requests in `results.txt`.
+
+#### Latency and cache-hit comparison
+
+| Policy | Requests | Hit rate | Hit mean | Miss mean | Hit p95 | Miss p95 | Mean speedup |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| TTL | 99 | 19.19% | 1.470s | 47.805s | 4.637s | 131.254s | 32.5x |
+| Inactivity | 100 | 19.00% | 1.821s | 74.575s | 3.874s | 200.998s | 41.0x |
+| Hit Count | 100 | 33.00% | 1.581s | 22.985s | 3.037s | 71.317s | 14.5x |
+
+The cache has a clear latency effect: successful cache hits take about 1.5 to 1.8 seconds on average, while misses take about 23 to 75 seconds. Hit Count performed best overall in this run because it had the highest hit rate, 33%, and the lowest mean miss latency, 22.985 seconds. TTL had a similar hit rate to Inactivity but lower miss latency. Inactivity shows the largest relative speedup on a hit, 41.0x, although its misses were the slowest on average and at p95.
+
+The TTL analysis contains 99 parsed requests even though the benchmark was configured for 100 queries; this is retained as recorded in `results.txt` and should be checked before treating the policy results as a strict equal-sample comparison. Mean speedup is calculated as `miss mean / hit mean`; p95 is the 95th percentile latency.
 
 ### Threshold results
 

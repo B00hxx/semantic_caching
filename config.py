@@ -134,11 +134,11 @@ class LiteLLMSettings(BaseSettings):
 
 
 class Settings(BaseSettings):
-    cache_ttl_seconds: int = 900
-    cache_inactivity_seconds: int = 900
+    cache_ttl_seconds: int = 90
+    cache_inactivity_seconds: int = 90
     cache_min_hit_count: int = 2
 
-    cache_invalidation_interval: int = 900
+    cache_invalidation_interval: int = 5
 
     lite_llm_settings: LiteLLMSettings = Field(
         default_factory=LiteLLMSettings
@@ -161,8 +161,8 @@ class Settings(BaseSettings):
     )
 
     delete_on_shutdown: bool = False
-    cache_eviction_interval: int = 1800
-    cache_max_size: int = 100
+    cache_eviction_interval: int = 5
+    cache_max_size: int = 50
 
     model_config = SettingsConfigDict(
         env_file=".env",
